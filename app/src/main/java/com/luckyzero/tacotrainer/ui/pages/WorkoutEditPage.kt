@@ -156,7 +156,7 @@ private fun SegmentItem(flatSegmentItem: FlatSegmentInterface,
     Row(modifier = Modifier.background(color = indentColor)) {
         Box(modifier = Modifier.padding(start = indent.dp).background(color = Color.White)) {
             when (flatSegmentItem) {
-                is FlatSegmentInterface.UniveralSet ->
+                is FlatSegmentInterface.Set ->
                     WorkoutSetItem(flatSegmentItem, segmentListContext)
                 is FlatSegmentInterface.Period ->
                     WorkoutPeriodItem(flatSegmentItem, segmentListContext)
@@ -168,7 +168,7 @@ private fun SegmentItem(flatSegmentItem: FlatSegmentInterface,
 }
 
 @Composable
-private fun WorkoutSetItem(set: FlatSegmentInterface.UniveralSet,
+private fun WorkoutSetItem(set: FlatSegmentInterface.Set,
                            segmentListContext: SegmentListContext) {
     Column {
         Box(modifier = Modifier.background(indentColor).fillMaxWidth().height(DIVIDER_HEIGHT.dp))
@@ -181,7 +181,7 @@ private fun WorkoutSetItem(set: FlatSegmentInterface.UniveralSet,
 }
 
 @Composable
-private fun EditableWorkoutSetItem(set: FlatSegmentInterface.UniveralSet,
+private fun EditableWorkoutSetItem(set: FlatSegmentInterface.Set,
                                    segmentListContext: SegmentListContext) {
     Row(modifier = Modifier
         .clickable { segmentListContext.selectedItem.value = null }
@@ -195,7 +195,7 @@ private fun EditableWorkoutSetItem(set: FlatSegmentInterface.UniveralSet,
 }
 
 @Composable
-private fun StaticWorkoutSetItem(set: FlatSegmentInterface.UniveralSet,
+private fun StaticWorkoutSetItem(set: FlatSegmentInterface.Set,
                                  segmentListContext: SegmentListContext) {
     Row(modifier = Modifier
         .clickable { segmentListContext.selectedItem.value = set.id }
