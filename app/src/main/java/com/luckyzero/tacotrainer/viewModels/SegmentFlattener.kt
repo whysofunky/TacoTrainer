@@ -12,12 +12,12 @@ object SegmentFlattener {
     private fun flattenSegment(
         segment: SegmentInterface?,
         depth: Int,
-        parent: FlatSegmentInterface.RootSet?,
+        parent: FlatSegmentInterface.UniveralSet?,
     ) : List<FlatSegmentInterface> {
         return when (segment) {
             null -> emptyList()
             is SegmentInterface.Set -> {
-                val set = FlatSegmentModel.Set(segment, depth, parent)
+                val set = FlatSegmentModel.UniversalSet(segment, depth, parent)
                 val footer = FlatSegmentModel.SetFooter(segment, depth, parent, set)
                 mutableListOf<FlatSegmentInterface>().apply {
                     add(set)
@@ -26,7 +26,7 @@ object SegmentFlattener {
                 }
             }
             is SegmentInterface.RootSet -> {
-                val set = FlatSegmentModel.RootSet(segment, depth)
+                val set = FlatSegmentModel.UniversalSet(segment, depth, null)
                 val footer = FlatSegmentModel.SetFooter(segment, depth, parent, set)
                 mutableListOf<FlatSegmentInterface>().apply {
                     add(set)
@@ -48,10 +48,11 @@ object SegmentFlattener {
     sealed class FlatSegmentModel(override val depth: Int) : FlatSegmentInterface {
         abstract val model: SegmentInterface
 
+        /*
         open class RootSet(
             override val model: SegmentInterface.RootSet,
             depth: Int,
-        ): FlatSegmentModel(depth), FlatSegmentInterface.RootSet {
+        ) : FlatSegmentModel(depth), FlatSegmentInterface.RootSet {
             override val id: Long?  get() = null
             override val repeatCount: Int get() = model.repeatCount
             override val parent: FlatSegmentInterface.RootSet?  get() = null
@@ -65,11 +66,21 @@ object SegmentFlattener {
             override val id: Long get() = model.segmentId
             override val repeatCount: Int get() = model.repeatCount
         }
+*/
+
+        class UniversalSet(
+            override val model: SegmentInterface.RootSet,
+            depth: Int,
+            override val parent: FlatSegmentInterface.UniveralSet?
+        ) : FlatSegmentModel(depth), FlatSegmentInterface.UniveralSet {
+            override val id: Long? get() = model.segmentId
+            override val repeatCount: Int get() = model.repeatCount
+        }
 
         class Period(
             override val model: SegmentInterface.Period,
             depth: Int,
-            override val parent: FlatSegmentInterface.RootSet?
+            override val parent: FlatSegmentInterface.UniveralSet?
         ) : FlatSegmentModel(depth), FlatSegmentInterface.Period {
             override val id: Long = model.segmentId
             override val name: String = model.name
@@ -79,8 +90,8 @@ object SegmentFlattener {
         class SetFooter(
             override val model: SegmentInterface.RootSet,
             depth: Int,
-            override val parent: FlatSegmentInterface.RootSet?,
-            override val set: FlatSegmentInterface.RootSet,
+            override val parent: FlatSegmentInterface.UniveralSet?,
+            override val set: FlatSegmentInterface.UniveralSet,
         ) : FlatSegmentModel(depth), FlatSegmentInterface.SetFooter {
             override val id: Long? = model.segmentId
         }
