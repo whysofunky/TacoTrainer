@@ -50,7 +50,7 @@ object SegmentFlattener {
             override val parent: FlatSegmentInterface.Set?
         ) : FlatSegmentModel(depth),
             FlatSegmentInterface.Set {
-            override val id: Long? get() = model.segmentId
+            override val id: Long get() = model.segmentId ?: 0
             override val repeatCount: Int get() = model.repeatCount
         }
 
@@ -70,7 +70,7 @@ object SegmentFlattener {
             override val parent: FlatSegmentInterface.Set?,
             override val set: FlatSegmentInterface.Set,
         ) : FlatSegmentModel(depth), FlatSegmentInterface.SetFooter {
-            override val id: Long? = model.segmentId
+            override val id: Long = model.segmentId ?: 0
         }
     }
 }

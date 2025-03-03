@@ -1,7 +1,7 @@
 package com.luckyzero.tacotrainer.models
 
 interface FlatSegmentInterface {
-    val id: Long?
+    val id: Long
     val parent: Set?
     val depth: Int
 
@@ -16,7 +16,7 @@ interface FlatSegmentInterface {
     }
 
     interface SetFooter : FlatSegmentInterface {
-        override val id: Long?
+        override val id: Long
         val set: Set
     }
 }

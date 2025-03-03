@@ -27,6 +27,9 @@ interface SegmentDao {
     @Update
     suspend fun update(segmentEntity: SegmentEntity)
 
+    @Query("UPDATE Segment SET sequence=(:sequence) WHERE id=(:segmentId)")
+    suspend fun updateSequence(segmentId: Long, sequence: Int)
+
     @Delete
     suspend fun delete(segmentEntity: SegmentEntity)
 

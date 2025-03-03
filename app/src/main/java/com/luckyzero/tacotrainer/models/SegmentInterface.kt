@@ -1,29 +1,24 @@
 package com.luckyzero.tacotrainer.models
 
 interface SegmentInterface {
+    val segmentId: Long?
     val totalDuration: Int
 
-    interface Parent : SegmentInterface {
-        val children: List<Child>
-    }
-
-    interface Child : SegmentInterface {
-        val segmentId: Long
-        val parent: Parent
-    }
-
-    interface RootSet : Parent {
+    interface RootSet : SegmentInterface {
         val repeatCount: Int
-        val segmentId: Long?
+        val children: List<SegmentInterface>
     }
 
-    interface Set : RootSet, Child {
+    interface Set : RootSet, SegmentInterface {
         override val segmentId: Long
+        val parent: SegmentInterface
     }
 
-    interface Period : Child {
+    interface Period : SegmentInterface {
+        override val segmentId: Long
         val name: String
         val duration: Int
+        val parent: SegmentInterface
     }
 }
 
