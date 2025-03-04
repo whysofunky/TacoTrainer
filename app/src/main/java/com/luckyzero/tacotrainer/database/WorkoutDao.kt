@@ -6,11 +6,15 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface WorkoutDao {
     @Query("SELECT * FROM Workout")
     suspend fun getAllWorkouts() : List<WorkoutEntity>
+
+    @Query("SELECT * from Workout")
+    fun getAllWorkoutsFlow() : Flow<List<WorkoutEntity>>
 
     @Query("SELECT * FROM Workout WHERE id=(:id)")
     suspend fun lookupWorkout(id: Long): WorkoutEntity?

@@ -25,7 +25,7 @@ class WorkoutEditViewModel(
     private val workoutDao by lazy { dbAccess.db.workoutDao() }
     private var workout: MutableWorkout? = null
 
-    private val _workoutFlow = MutableStateFlow<MutableWorkout?>(null)
+    private val _workoutFlow = MutableStateFlow<WorkoutInterface?>(null)
     private val _flatSegmentFlow = MutableStateFlow<List<FlatSegmentInterface>>(emptyList())
     val workoutFlow: StateFlow<WorkoutInterface?> = _workoutFlow
     val flatSegmentFlow: StateFlow<List<FlatSegmentInterface>> = _flatSegmentFlow
@@ -155,9 +155,7 @@ class WorkoutEditViewModel(
     }
 
     private fun publishFlatList() {
-        // TODO: If I want the workout's duration to change, I need to publish a different, immutable
-        // item with the new duration.
-        _workoutFlow.value = workout
+        _workoutFlow.value = workout?.toImmutable()
         _flatSegmentFlow.value = SegmentFlattener.flatten(workout)
     }
 
@@ -320,6 +318,13 @@ class WorkoutEditViewModel(
         }
     }
 
+    private class ImmutableWorkout(
+        override val id: Long,
+        override val name: String,
+        override val repeatCount: Int,
+        override val totalDuration: Int,
+    ): WorkoutInterface
+
     private interface MutableParent : SegmentInterface {
         val children : MutableList<MutableChild>
     }
@@ -330,10 +335,10 @@ class WorkoutEditViewModel(
     }
 
     private class MutableWorkout(
-        override val id: Long,
-        override var name: String,
+        val id: Long,
+        var name: String,
         override var repeatCount: Int
-    ) : WorkoutInterface, MutableParent, SegmentInterface.RootSet {
+    ) : MutableParent, SegmentInterface.RootSet {
         override val segmentId: Long?
             get() = null
         override val children = mutableListOf<MutableChild>()
@@ -343,6 +348,8 @@ class WorkoutEditViewModel(
             children.clear()
             children.addAll(newChildren)
         }
+
+        fun toImmutable() = ImmutableWorkout(id, name, repeatCount, totalDuration)
     }
 
     private class MutableSet(
