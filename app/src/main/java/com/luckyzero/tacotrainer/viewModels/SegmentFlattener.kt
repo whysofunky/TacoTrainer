@@ -16,7 +16,7 @@ object SegmentFlattener {
     ) : List<FlatSegmentInterface> {
         return when (segment) {
             null -> emptyList()
-            is SegmentInterface.Set -> {
+            is SegmentInterface.ChildSet -> {
                 val set = FlatSegmentModel.Set(segment, depth, parent)
                 val footer = FlatSegmentModel.SetFooter(segment, depth, parent, set)
                 mutableListOf<FlatSegmentInterface>().apply {
@@ -25,7 +25,7 @@ object SegmentFlattener {
                     add(footer)
                 }
             }
-            is SegmentInterface.RootSet -> {
+            is SegmentInterface.Set -> {
                 val set = FlatSegmentModel.Set(segment, depth, null)
                 val footer = FlatSegmentModel.SetFooter(segment, depth, parent, set)
                 mutableListOf<FlatSegmentInterface>().apply {
@@ -45,7 +45,7 @@ object SegmentFlattener {
         abstract val model: SegmentInterface
 
         class Set(
-            override val model: SegmentInterface.RootSet,
+            override val model: SegmentInterface.Set,
             depth: Int,
             override val parent: FlatSegmentInterface.Set?
         ) : FlatSegmentModel(depth),
@@ -65,7 +65,7 @@ object SegmentFlattener {
         }
 
         class SetFooter(
-            override val model: SegmentInterface.RootSet,
+            override val model: SegmentInterface.Set,
             depth: Int,
             override val parent: FlatSegmentInterface.Set?,
             override val set: FlatSegmentInterface.Set,

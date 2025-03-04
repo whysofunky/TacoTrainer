@@ -51,9 +51,10 @@ fun BasicNameField(
         value = textState.value,
         onValueChange = { newValue: TextFieldValue ->
             textState.value = newValue
+            name.value = newValue.text
         },
         singleLine = true,
-        textStyle = TextStyle(fontSize = 20.sp),
+        textStyle = textStyle.copy(fontSize = 20.sp),
         keyboardOptions = KeyboardOptions.Default.copy(
             imeAction = ImeAction.Done
         ),

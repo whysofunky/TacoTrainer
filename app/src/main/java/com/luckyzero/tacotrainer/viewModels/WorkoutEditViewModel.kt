@@ -21,6 +21,10 @@ class WorkoutEditViewModel(
     private val dbAccess: DbAccess
 ) : ViewModel() {
 
+    companion object {
+        const val ROOT_SET_ID = 0L
+    }
+
     private val segmentDao by lazy { dbAccess.db.segmentDao() }
     private val workoutDao by lazy { dbAccess.db.workoutDao() }
     private var workout: MutableWorkout? = null
@@ -41,9 +45,9 @@ class WorkoutEditViewModel(
         }
     }
 
-    fun createSet(parentSetId: Long?) : Flow<Long> {
+    fun createSet(parentSetId: Long) : Flow<Long> {
         val parent = getParent(parentSetId)
-        val set = MutableSet(0, parent, 1)
+        val set = MutableChildSet(0, parent, 1)
         parent.children.add(set)
         val flow = MutableSharedFlow<Long>()
         viewModelScope.launch {
@@ -54,7 +58,7 @@ class WorkoutEditViewModel(
         return flow
     }
 
-    fun createPeriod(parentSetId: Long?) : Flow<Long> {
+    fun createPeriod(parentSetId: Long) : Flow<Long> {
         val parent = getParent(parentSetId)
         val period = MutablePeriod(0, parent, "", 0)
         parent.children.add(period)
@@ -79,7 +83,7 @@ class WorkoutEditViewModel(
 
     fun updateSet(segmentId: Long, repeatCount: Int?) {
         val set = findSegment(segmentId)
-        (set as? MutableSet) ?: run {
+        (set as? MutableChildSet) ?: run {
             throw IllegalStateException("segment $segmentId is not a set")
         }
         if (repeatCount != null) set.repeatCount = repeatCount
@@ -104,7 +108,7 @@ class WorkoutEditViewModel(
 
     fun deleteSet(segmentId: Long) {
         val segment = findSegment(segmentId)
-        (segment as? MutableSet) ?: run {
+        (segment as? MutableChildSet) ?: run {
             throw IllegalStateException("segment $segmentId is not a set")
         }
         val parent = segment.parent
@@ -128,8 +132,8 @@ class WorkoutEditViewModel(
         publishFlatList()
     }
 
-    private fun getParent(parentSetId: Long?) : MutableParent {
-        return if (parentSetId == null) {
+    private fun getParent(parentSetId: Long) : MutableParent {
+        return if (parentSetId == ROOT_SET_ID) {
             workout ?: run { throw IllegalStateException("Workout uninitialized" )}
         } else {
             (findSegment(parentSetId) as? MutableParent) ?: run {
@@ -147,7 +151,7 @@ class WorkoutEditViewModel(
             if (segment.segmentId == segmentId) {
                 return segment
             }
-            if (segment is MutableSet) {
+            if (segment is MutableChildSet) {
                 stack.addAll(segment.children)
             }
         }
@@ -172,10 +176,10 @@ class WorkoutEditViewModel(
         return loadWorkout(workoutId)
     }
 
-    private suspend fun createSetEntity(set: MutableSet): Long {
+    private suspend fun createSetEntity(set: MutableChildSet): Long {
         val parent = set.parent
         val workoutId = (parent as? MutableWorkout)?.id
-        val parentSegmentId = (parent as? MutableSet)?.segmentId
+        val parentSegmentId = (parent as? MutableChildSet)?.segmentId
         val sequence = parent.children.indexOf(set)
 
         val segmentEntity =  SegmentEntity(
@@ -195,7 +199,7 @@ class WorkoutEditViewModel(
     private suspend fun createPeriodEntity(period: MutablePeriod): Long {
         val parent = period.parent
         val workoutId = (parent as? MutableWorkout)?.id
-        val parentSegmentId = (parent as? MutableSet)?.segmentId
+        val parentSegmentId = (parent as? MutableChildSet)?.segmentId
         val sequence = parent.children.indexOf(period)
 
         val segmentEntity = SegmentEntity(
@@ -226,10 +230,10 @@ class WorkoutEditViewModel(
         }
     }
 
-    private suspend fun updateSetEntity(set: MutableSet) {
+    private suspend fun updateSetEntity(set: MutableChildSet) {
         val parent = set.parent
         val workoutId = (parent as? MutableWorkout)?.id
-        val parentSegmentId = (parent as? MutableSet)?.segmentId
+        val parentSegmentId = (parent as? MutableChildSet)?.segmentId
         val sequence = parent.children.indexOf(set)
 
         val segmentEntity =  SegmentEntity(
@@ -249,7 +253,7 @@ class WorkoutEditViewModel(
     private suspend fun updatePeriodEntity(period: MutablePeriod) {
         val parent = period.parent
         val workoutId = (parent as? MutableWorkout)?.id
-        val parentSegmentId = (parent as? MutableSet)?.segmentId
+        val parentSegmentId = (parent as? MutableChildSet)?.segmentId
         val sequence = parent.children.indexOf(period)
 
         val segmentEntity = SegmentEntity(
@@ -292,7 +296,7 @@ class WorkoutEditViewModel(
         return loadChildren(workout, dbSegments)
     }
 
-    private suspend fun loadSegmentChildren(set: MutableSet) : List<MutableChild> {
+    private suspend fun loadSegmentChildren(set: MutableChildSet) : List<MutableChild> {
         val dbSegments = segmentDao.segmentsByParent(set.segmentId)
         return loadChildren(set, dbSegments)
     }
@@ -300,7 +304,7 @@ class WorkoutEditViewModel(
     private suspend fun loadChildren(parent: MutableParent, dbSegments: List<SegmentEntity>) : List<MutableChild> {
         return dbSegments.map { segment ->
             segment.repeatCount?.let { repeatCount ->
-                MutableSet(
+                MutableChildSet(
                     segment.id,
                     parent,
                     repeatCount,
@@ -335,10 +339,10 @@ class WorkoutEditViewModel(
     }
 
     private class MutableWorkout(
-        val id: Long,
-        var name: String,
+        override val id: Long,
+        override var name: String,
         override var repeatCount: Int
-    ) : MutableParent, SegmentInterface.RootSet {
+    ) : WorkoutInterface, MutableParent, SegmentInterface.Set {
         override val segmentId: Long?
             get() = null
         override val children = mutableListOf<MutableChild>()
@@ -352,11 +356,11 @@ class WorkoutEditViewModel(
         fun toImmutable() = ImmutableWorkout(id, name, repeatCount, totalDuration)
     }
 
-    private class MutableSet(
+    private class MutableChildSet(
         override var segmentId: Long,
         override var parent: MutableParent,
         override var repeatCount: Int,
-    ): SegmentInterface.Set, MutableParent, MutableChild {
+    ): SegmentInterface.ChildSet, MutableParent, MutableChild {
         override val children = mutableListOf<MutableChild>()
         override val totalDuration: Int
             get() = children.sumOf { it.totalDuration } * repeatCount

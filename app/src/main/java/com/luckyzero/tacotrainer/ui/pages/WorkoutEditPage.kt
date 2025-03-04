@@ -76,13 +76,13 @@ private val indentColor = Color.Green
 //    the text is deselected immediately in onValueChange]
 //
 // Edit page:
-// * Listen to flow for Id of new set or period
+//
+// List page:
+//  * implement delete
+//
 // Allow reordering
 // Animate transitions between selected and not selected
 //
-// Other pages
-// implement execute page
-
 
 @Composable
 fun WorkoutEditPage(args: WorkoutEdit,
@@ -234,7 +234,7 @@ private fun StaticWorkoutSetItem(set: FlatSegmentInterface.Set,
             .height(DEFAULT_ROW_HEIGHT.dp)
             .clickable { segmentListContext.selectedItem.value = set.id }
     ) {
-        if (set.repeatCount == 1) {
+        if (set.repeatCount == 1 && set.depth == 0) {
             Text(text = "Main set", fontSize = 20.sp)
         } else {
             Text(text = "Repeat: ", fontSize = 20.sp)

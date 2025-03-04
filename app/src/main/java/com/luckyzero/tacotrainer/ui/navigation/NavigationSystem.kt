@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.luckyzero.tacotrainer.ui.pages.WorkoutEditPage
+import com.luckyzero.tacotrainer.ui.pages.WorkoutExecutePage
 import com.luckyzero.tacotrainer.ui.pages.WorkoutListPage
 
 @Composable
@@ -22,6 +23,7 @@ fun NavigationSystem() {
         }
         composable<WorkoutExecute> {
             var args = it.toRoute<WorkoutExecute>()
+            WorkoutExecutePage(args, navController, modifier = Modifier)
         }
     }
 }

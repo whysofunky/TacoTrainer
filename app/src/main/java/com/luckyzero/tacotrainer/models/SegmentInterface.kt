@@ -4,12 +4,12 @@ interface SegmentInterface {
     val segmentId: Long?
     val totalDuration: Int
 
-    interface RootSet : SegmentInterface {
+    interface Set : SegmentInterface {
         val repeatCount: Int
         val children: List<SegmentInterface>
     }
 
-    interface Set : RootSet, SegmentInterface {
+    interface ChildSet : Set, SegmentInterface {
         override val segmentId: Long
         val parent: SegmentInterface
     }
@@ -19,6 +19,8 @@ interface SegmentInterface {
         val name: String
         val duration: Int
         val parent: SegmentInterface
+
+        val durationMs: Long get() = duration.toLong() * 1000
     }
 }
 
