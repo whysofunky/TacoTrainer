@@ -59,7 +59,7 @@ class WorkoutEditViewModel(
         val flow = MutableSharedFlow<Long>()
         // TODO: This means we are waiting for the db operation to complete before publishing
         viewModelScope.launch {
-            val newPeriod = segmentTree.createSet(parent)
+            val newPeriod = segmentTree.createPeriod(parent)
             publishFlatList()
             flow.emit(newPeriod.segmentId)
         }

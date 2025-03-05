@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -34,12 +33,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,17 +45,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.luckyzero.tacotrainer.database.DbAccess
 import com.luckyzero.tacotrainer.models.FlatSegmentInterface
-import com.luckyzero.tacotrainer.models.SegmentInterface
 import com.luckyzero.tacotrainer.models.WorkoutInterface
 import com.luckyzero.tacotrainer.repositories.SegmentTreeLoader
 import com.luckyzero.tacotrainer.ui.navigation.WorkoutEdit
 import com.luckyzero.tacotrainer.ui.utils.UIUtils
-import com.luckyzero.tacotrainer.ui.widgets.BasicCountField
-import com.luckyzero.tacotrainer.ui.widgets.BasicDurationField
-import com.luckyzero.tacotrainer.ui.widgets.BasicNameField
+import com.luckyzero.tacotrainer.ui.widgets.CountField
+import com.luckyzero.tacotrainer.ui.widgets.DurationField
+import com.luckyzero.tacotrainer.ui.widgets.NameField
 import com.luckyzero.tacotrainer.viewModels.WorkoutEditViewModel
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 
@@ -70,6 +65,9 @@ private val indentColor = Color.Green
 
 
 // TODO
+// General
+//  Strings are resources
+//
 // Number entry fields
 //  * improve decorations
 //  * fix deletion of ":". If the cursor is to the right of the ":" and you hit backspace, it
@@ -78,13 +76,20 @@ private val indentColor = Color.Green
 //    the text is deselected immediately in onValueChange]
 //
 // Edit page:
+//  * Animate item selection
+//  * Allow reordering
 //
 // List page:
 //  * implement delete
 //
-// Allow reordering
-// Animate transitions between selected and not selected
 //
+
+
+private data class SegmentListContext(
+    val viewModel: WorkoutEditViewModel,
+    val selectedItem: MutableState<Long?>,
+    val coroutineScope: CoroutineScope
+)
 
 @Composable
 fun WorkoutEditPage(args: WorkoutEdit,
@@ -103,7 +108,8 @@ fun WorkoutEditPage(args: WorkoutEdit,
 private fun PageHeading(viewModel: WorkoutEditViewModel) {
     val workout = viewModel.workoutFlow.collectAsStateWithLifecycle().value
     if (workout != null) {
-        // TODO: Make this use the same "selected item" mutable state
+        // TODO: Make this use the same "selected item" mutable state, so that only one item
+        // can be selected at a time.
         val editing = remember { mutableStateOf(false) }
         if (editing.value) {
             EditablePageHeading(workout, updateWorkout = {
@@ -167,13 +173,6 @@ private fun EditablePageHeading(
         )
     }
 }
-
-private data class SegmentListContext(
-    val viewModel: WorkoutEditViewModel,
-    val selectedItem: MutableState<Long?>,
-    val coroutineScope: CoroutineScope
-)
-
 
 @Composable
 private fun SegmentList(viewModel: WorkoutEditViewModel, navController: NavHostController) {
@@ -265,7 +264,7 @@ private fun EditableWorkoutSetItem(set: FlatSegmentInterface.Set,
         ) {
             Text(text = "Repeat: ", fontSize = 20.sp)
             Spacer(modifier = Modifier.width(8.dp))
-            BasicCountField(repeatCount,
+            CountField(repeatCount,
                 textStyle = TextStyle(fontSize = 20.sp),
                 Modifier.width(96.dp).focusRequester(focusRequester)
             )
@@ -356,13 +355,13 @@ private fun EditablePeriodItem(period: FlatSegmentInterface.Period,
         Row(verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.height(DEFAULT_ROW_HEIGHT.dp)
         ) {
-            BasicNameField(
+            NameField(
                 name,
                 textStyle = TextStyle(fontSize = 20.sp),
                 modifier = Modifier.weight(1f).focusRequester(focusRequester),
             )
             Spacer(modifier = Modifier.widthIn(min=12.dp))
-            BasicDurationField(
+            DurationField(
                 duration = duration,
                 textStyle = TextStyle(fontSize = 20.sp),
                 modifier = Modifier.width(96.dp),

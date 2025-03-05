@@ -19,43 +19,29 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
-import com.luckyzero.tacotrainer.ui.utils.UIUtils
 
-private const val TAG = "DurationField"
+private const val TAG = "CountField"
 
 @Composable
-fun DurationField(
-    duration: MutableIntState,
-    textStyle: TextStyle = LocalTextStyle.current,
-    modifier: Modifier = Modifier,
+fun CountField(count: MutableIntState,
+               textStyle: TextStyle = LocalTextStyle.current,
+               modifier: Modifier = Modifier,
 ) {
-    val initialText = UIUtils.formatDuration(duration.intValue, UIUtils.DurationElement.NONE)
     val textState = remember {
-        mutableStateOf(
-            TextFieldValue(
-                text = initialText,
-                selection = TextRange(initialText.length)
-            )
-        )
+        mutableStateOf(TextFieldValue(count.intValue.toString()))
     }
 
-    val onValueChanged = { newValue: TextFieldValue ->
-        Log.d(TAG, "Duration: onValueChanged input value '${newValue.text}' selection ${newValue.selection}")
+    val onValueChange = { newValue: TextFieldValue ->
+        Log.d(TAG, "input value '${newValue.text}', " +
+                "selection ${newValue.selection.start}-${newValue.selection.end}")
         val numbersOnly = newValue.text
             .filter { it.isDigit() }
-            .padStart(6, '0')
+            .takeLast(6) // No more than six digits. Prevents integer overflow.
         val selectionEnd = newValue.selection.end
-        val length = numbersOnly.length
-        val seconds = numbersOnly.takeLast(2).toInt()
-        val minutes = numbersOnly.take(length-2).takeLast(2).toInt()
-        val hours = numbersOnly.take(length-4).takeLast(2).toInt()
+        val newValueInt = if (numbersOnly.isBlank()) 0 else numbersOnly.toInt()
         // TODO: It would be nice to retain zeros to the right of the selection.
-        val newText = if (hours > 0) {
-            "%d:%02d:%02d".format(hours, minutes, seconds)
-        } else if (minutes > 0) {
-            "%d:%02d".format(minutes, seconds)
-        } else if (seconds > 0) {
-            "%d".format(seconds)
+        val newText = if (newValueInt > 0) {
+            newValueInt.toString()
         } else {
             ""
         }
@@ -63,13 +49,12 @@ fun DurationField(
         Log.d(TAG, "output value '${outputValue.text}', " +
                 "selection ${outputValue.selection.start}-${outputValue.selection.end}")
         textState.value = outputValue
-        val durationSeconds = seconds + minutes * 60 + hours * 3600
-        duration.intValue = durationSeconds
+        count.intValue = newValueInt
     }
 
     BasicTextField(
         value = textState.value,
-        onValueChange = onValueChanged,
+        onValueChange = onValueChange,
         singleLine = true,
         keyboardOptions =  KeyboardOptions.Default.copy(
             imeAction = ImeAction.Done,
@@ -78,7 +63,7 @@ fun DurationField(
         keyboardActions = KeyboardActions(
             onDone = {
                 textState.value = textState.value.copy(
-                    text = UIUtils.formatDuration(duration.intValue, UIUtils.DurationElement.NONE)
+                    text = count.intValue.toString()
                 )
             }
         ),
@@ -89,9 +74,6 @@ fun DurationField(
             }
         },
         modifier = modifier.onFocusChanged {
-            // TODO: This doesn't always work correctly. Sometimes onValueChanged is immediately
-            // called, and clears the selection.
-            Log.d(TAG, "Duration: onFocusChanged ${it.isFocused}")
             if (it.isFocused) {
                 val text = textState.value.text
                 textState.value = textState.value.copy(selection = TextRange(0, text.length))
@@ -99,4 +81,3 @@ fun DurationField(
         },
     )
 }
-
