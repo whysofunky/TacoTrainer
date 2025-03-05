@@ -1,6 +1,5 @@
 package com.luckyzero.tacotrainer.repositories
 
-import androidx.lifecycle.viewModelScope
 import com.luckyzero.tacotrainer.database.DbAccess
 import com.luckyzero.tacotrainer.database.SegmentEntity
 import com.luckyzero.tacotrainer.database.WorkoutEntity
@@ -11,9 +10,9 @@ import kotlinx.coroutines.withContext
 
 
 interface SegmentTreeInterface {
-    val workout: WorkoutInterface
+    val workout: SegmentInterface.Workout
 
-    suspend fun createSet(parentSet: SegmentInterface.Set) : SegmentInterface.Set
+    suspend fun createSet(parentSet: SegmentInterface.Set) : SegmentInterface.ChildSet
     suspend fun createPeriod(parentSet: SegmentInterface.Set) : SegmentInterface.Period
     suspend fun updateWorkout(name: String?, repeatCount: Int?)
     suspend fun updateSet(set: SegmentInterface.Set, repeatCount: Int?)
@@ -26,13 +25,37 @@ class SegmentTreeLoader(dbAccess: DbAccess) {
     private val workoutDao by lazy { dbAccess.db.workoutDao() }
     private val segmentDao by lazy { dbAccess.db.segmentDao() }
 
+    suspend fun createWorkout(name: String) : SegmentTreeInterface {
+        val workoutEntity = WorkoutEntity(
+            0,
+            name,
+            0,
+            1
+        )
+        val workoutId = workoutDao.insert(workoutEntity)
+        return loadWorkout(workoutId)
+    }
+
+    suspend fun loadWorkout(workoutId: Long) : SegmentTreeInterface {
+        return workoutDao.lookupWorkout(workoutId)?.let { dbWorkout ->
+            MutableWorkout(
+                dbWorkout.id,
+                dbWorkout.name,
+                dbWorkout.repeatCount
+            ).apply {
+                setChildren(loadWorkoutChildren(this))
+            }.let {
+                SegmentTree(it)
+            }
+        } ?: throw IllegalStateException("No such workout $workoutId")
+    }
 
     private inner class SegmentTree(
         val mutableWorkout: MutableWorkout,
     ) : SegmentTreeInterface {
-        override val workout: WorkoutInterface = mutableWorkout
+        override val workout: SegmentInterface.Workout = mutableWorkout
 
-        override suspend fun createSet(parentSet: SegmentInterface.Set) : SegmentInterface.Set {
+        override suspend fun createSet(parentSet: SegmentInterface.Set) : SegmentInterface.ChildSet {
             val parent = parentSet as MutableParent
             val set = MutableChildSet(
                 0,
@@ -92,8 +115,7 @@ class SegmentTreeLoader(dbAccess: DbAccess) {
 
         private suspend fun createSetEntity(set: MutableChildSet): Long {
             val parent = set.parent
-            val workoutId = (parent as? MutableWorkout)?.id
-            val parentSegmentId = (parent as? MutableChildSet)?.segmentId
+            val (workoutId, parentSegmentId) = parentIds(parent)
             val sequence = parent.children.indexOf(set)
 
             val segmentEntity =  SegmentEntity(
@@ -112,8 +134,7 @@ class SegmentTreeLoader(dbAccess: DbAccess) {
 
         private suspend fun createPeriodEntity(period: MutablePeriod): Long {
             val parent = period.parent
-            val workoutId = (parent as? MutableWorkout)?.id
-            val parentSegmentId = (parent as? MutableChildSet)?.segmentId
+            val (workoutId, parentSegmentId) = parentIds(parent)
             val sequence = parent.children.indexOf(period)
 
             val segmentEntity = SegmentEntity(
@@ -134,7 +155,7 @@ class SegmentTreeLoader(dbAccess: DbAccess) {
 
         private suspend fun updateWorkoutEntity(workout: MutableWorkout) {
             val workoutEntity = WorkoutEntity(
-                workout.id,
+                workout.workoutId,
                 workout.name,
                 workout.totalDuration,
                 workout.repeatCount
@@ -146,8 +167,7 @@ class SegmentTreeLoader(dbAccess: DbAccess) {
 
         private suspend fun updateSetEntity(set: MutableChildSet) {
             val parent = set.parent
-            val workoutId = (parent as? MutableWorkout)?.id
-            val parentSegmentId = (parent as? MutableChildSet)?.segmentId
+            val (workoutId, parentSegmentId) = parentIds(parent)
             val sequence = parent.children.indexOf(set)
 
             val segmentEntity =  SegmentEntity(
@@ -166,8 +186,7 @@ class SegmentTreeLoader(dbAccess: DbAccess) {
 
         private suspend fun updatePeriodEntity(period: MutablePeriod) {
             val parent = period.parent
-            val workoutId = (parent as? MutableWorkout)?.id
-            val parentSegmentId = (parent as? MutableChildSet)?.segmentId
+            val (workoutId, parentSegmentId) = parentIds(parent)
             val sequence = parent.children.indexOf(period)
 
             val segmentEntity = SegmentEntity(
@@ -192,35 +211,17 @@ class SegmentTreeLoader(dbAccess: DbAccess) {
                 }
             }
         }
-    }
 
-    private suspend fun createWorkout(name: String) : SegmentTree {
-        val workoutEntity = WorkoutEntity(
-            0,
-            name,
-            0,
-            1
-        )
-        val workoutId = workoutDao.insert(workoutEntity)
-        return loadWorkout(workoutId)
-    }
-
-    private suspend fun loadWorkout(workoutId: Long) : SegmentTree {
-        return workoutDao.lookupWorkout(workoutId)?.let { dbWorkout ->
-            MutableWorkout(
-                dbWorkout.id,
-                dbWorkout.name,
-                dbWorkout.repeatCount
-            ).apply {
-                setChildren(loadWorkoutChildren(this))
-            }.let {
-                SegmentTree(it)
-            }
-        } ?: throw IllegalStateException("No such workout $workoutId")
+        private fun parentIds(parent: MutableParent) : Pair<Long?, Long?> {
+            return Pair(
+                (parent as? MutableWorkout)?.workoutId,
+                (parent as? MutableChildSet)?.segmentId
+            )
+        }
     }
 
     private suspend fun loadWorkoutChildren(workout: MutableWorkout) : List<MutableChild> {
-        val dbSegments = segmentDao.segmentsByWorkout(workout.id)
+        val dbSegments = segmentDao.segmentsByWorkout(workout.workoutId)
         return loadChildren(workout, dbSegments)
     }
 
@@ -250,8 +251,8 @@ class SegmentTreeLoader(dbAccess: DbAccess) {
         }
     }
 
-    private interface MutableParent : SegmentInterface {
-        val children : MutableList<MutableChild>
+    private interface MutableParent : SegmentInterface.Set {
+        override val children : MutableList<MutableChild>
     }
 
     private interface MutableChild : SegmentInterface {
@@ -260,10 +261,10 @@ class SegmentTreeLoader(dbAccess: DbAccess) {
     }
 
     private class MutableWorkout(
-        override val id: Long,
+        override val workoutId: Long,
         override var name: String,
         override var repeatCount: Int
-    ) : WorkoutInterface, MutableParent, SegmentInterface.Set {
+    ) : SegmentInterface.Workout, MutableParent{
         override val segmentId: Long?
             get() = null
         override val children = mutableListOf<MutableChild>()

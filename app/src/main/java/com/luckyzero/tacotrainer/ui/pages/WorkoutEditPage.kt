@@ -48,7 +48,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.luckyzero.tacotrainer.database.DbAccess
 import com.luckyzero.tacotrainer.models.FlatSegmentInterface
+import com.luckyzero.tacotrainer.models.SegmentInterface
 import com.luckyzero.tacotrainer.models.WorkoutInterface
+import com.luckyzero.tacotrainer.repositories.SegmentTreeLoader
 import com.luckyzero.tacotrainer.ui.navigation.WorkoutEdit
 import com.luckyzero.tacotrainer.ui.utils.UIUtils
 import com.luckyzero.tacotrainer.ui.widgets.BasicCountField
@@ -89,7 +91,8 @@ fun WorkoutEditPage(args: WorkoutEdit,
                     navHostController: NavHostController,
                     modifier: Modifier) {
     val dbAccess = DbAccess(LocalContext.current)
-    val viewModel = viewModel { WorkoutEditViewModel(args.workoutId, dbAccess) }
+    val segmentTreeLoader = SegmentTreeLoader(dbAccess)
+    val viewModel = viewModel { WorkoutEditViewModel(args.workoutId, segmentTreeLoader) }
     Column {
         PageHeading(viewModel)
         SegmentList(viewModel, navHostController)
@@ -99,8 +102,9 @@ fun WorkoutEditPage(args: WorkoutEdit,
 @Composable
 private fun PageHeading(viewModel: WorkoutEditViewModel) {
     val workout = viewModel.workoutFlow.collectAsStateWithLifecycle().value
-    workout?.let {
-        val editing = remember { mutableStateOf(workout.id == null) }
+    if (workout != null) {
+        // TODO: Make this use the same "selected item" mutable state
+        val editing = remember { mutableStateOf(false) }
         if (editing.value) {
             EditablePageHeading(workout, updateWorkout = {
                 viewModel.updateWorkout(it, null)

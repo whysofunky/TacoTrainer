@@ -2,33 +2,28 @@ package com.luckyzero.tacotrainer.viewModels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.luckyzero.tacotrainer.database.DbAccess
-import com.luckyzero.tacotrainer.database.SegmentEntity
-import com.luckyzero.tacotrainer.database.WorkoutEntity
 import com.luckyzero.tacotrainer.models.FlatSegmentInterface
 import com.luckyzero.tacotrainer.models.SegmentInterface
 import com.luckyzero.tacotrainer.models.WorkoutInterface
-import kotlinx.coroutines.Dispatchers
+import com.luckyzero.tacotrainer.repositories.SegmentTreeInterface
+import com.luckyzero.tacotrainer.repositories.SegmentTreeLoader
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class WorkoutEditViewModel(
-    private var workoutId: Long?,
-    private val dbAccess: DbAccess
+    workoutId: Long?,
+    private val segmentTreeLoader: SegmentTreeLoader,
 ) : ViewModel() {
 
     companion object {
         const val ROOT_SET_ID = 0L
+        const val NEW_WORKOUT_NAME = "New Workout"
     }
 
-    private val segmentDao by lazy { dbAccess.db.segmentDao() }
-    private val workoutDao by lazy { dbAccess.db.workoutDao() }
-    private var workout: MutableWorkout? = null
-
+    private lateinit var segmentTree: SegmentTreeInterface
     private val _workoutFlow = MutableStateFlow<WorkoutInterface?>(null)
     private val _flatSegmentFlow = MutableStateFlow<List<FlatSegmentInterface>>(emptyList())
     val workoutFlow: StateFlow<WorkoutInterface?> = _workoutFlow
@@ -36,10 +31,10 @@ class WorkoutEditViewModel(
 
     init {
         viewModelScope.launch {
-            workoutId?.let {
-                workout = loadWorkout(it)
-            } ?: run {
-                workout = createWorkout()
+            segmentTree = if (workoutId == null) {
+                segmentTreeLoader.createWorkout(NEW_WORKOUT_NAME)
+            } else {
+                segmentTreeLoader.loadWorkout(workoutId)
             }
             publishFlatList()
         }
@@ -47,111 +42,109 @@ class WorkoutEditViewModel(
 
     fun createSet(parentSetId: Long) : Flow<Long> {
         val parent = getParent(parentSetId)
-        val set = MutableChildSet(0, parent, 1)
-        parent.children.add(set)
         val flow = MutableSharedFlow<Long>()
+        // TODO: This means we are waiting for the db operation to complete before publishing
+        // To change this, the segmentTree would need to have its own lifecycle so that it could
+        // return while still finishing the db operations.
         viewModelScope.launch {
-            val id = createSetEntity(set)
+            val newSet = segmentTree.createSet(parent)
             publishFlatList()
-            flow.emit(id)
+            flow.emit(newSet.segmentId)
         }
         return flow
     }
 
     fun createPeriod(parentSetId: Long) : Flow<Long> {
         val parent = getParent(parentSetId)
-        val period = MutablePeriod(0, parent, "", 0)
-        parent.children.add(period)
         val flow = MutableSharedFlow<Long>()
+        // TODO: This means we are waiting for the db operation to complete before publishing
         viewModelScope.launch {
-            val id = createPeriodEntity(period)
+            val newPeriod = segmentTree.createSet(parent)
             publishFlatList()
-            flow.emit(id)
+            flow.emit(newPeriod.segmentId)
         }
         return flow
     }
 
     fun updateWorkout(name: String?, repeatCount: Int?) {
-        val w = workout ?: run { throw IllegalStateException("Workout uninitialized") }
-        if (name != null) w.name = name
-        if (repeatCount != null) w.repeatCount = repeatCount
+        // TODO: This means we are waiting for the db operation to complete before publishing
         viewModelScope.launch {
-            updateWorkoutEntity(w)
+            segmentTree.updateWorkout(name, repeatCount)
         }
         publishFlatList()
     }
 
     fun updateSet(segmentId: Long, repeatCount: Int?) {
-        val set = findSegment(segmentId)
-        (set as? MutableChildSet) ?: run {
-            throw IllegalStateException("segment $segmentId is not a set")
-        }
-        if (repeatCount != null) set.repeatCount = repeatCount
+        val set = findSet(segmentId)
         viewModelScope.launch {
-            updateSetEntity(set)
+            segmentTree.updateSet(set, repeatCount)
         }
         publishFlatList()
     }
 
     fun updatePeriod(segmentId: Long, name: String?, duration: Int?) {
-        val period = findSegment(segmentId)
-        (period as? MutablePeriod) ?: run {
-            throw IllegalStateException("segment $segmentId is not a period")
-        }
-        if (name != null) period.name = name
-        if (duration != null) period.duration = duration
+        val period = findPeriod(segmentId)
         viewModelScope.launch {
-            updatePeriodEntity(period)
+            segmentTree.updatePeriod(period, name, duration)
         }
         publishFlatList()
     }
 
     fun deleteSet(segmentId: Long) {
-        val segment = findSegment(segmentId)
-        (segment as? MutableChildSet) ?: run {
-            throw IllegalStateException("segment $segmentId is not a set")
-        }
-        val parent = segment.parent
-        parent.children.remove(segment)
+        val set = findSet(segmentId)
         viewModelScope.launch {
-            deleteSegmentEntity(segment)
+            segmentTree.deleteSet(set)
         }
         publishFlatList()
     }
 
     fun deletePeriod(segmentId: Long) {
-        val segment = findSegment(segmentId)
-        (segment as? MutablePeriod) ?: run {
-            throw IllegalStateException("segment $segmentId is not a period")
-        }
-        val parent = segment.parent
-        parent.children.remove(segment)
+        val period = findPeriod(segmentId)
         viewModelScope.launch {
-            deleteSegmentEntity(segment)
+            segmentTree.deletePeriod(period)
         }
         publishFlatList()
     }
 
-    private fun getParent(parentSetId: Long) : MutableParent {
+    private fun getParent(parentSetId: Long) : SegmentInterface.Set {
         return if (parentSetId == ROOT_SET_ID) {
-            workout ?: run { throw IllegalStateException("Workout uninitialized" )}
+            segmentTree.workout
         } else {
-            (findSegment(parentSetId) as? MutableParent) ?: run {
-                throw IllegalStateException("segment $parentSetId is not a Set")
-            }
+            findSet(parentSetId) ?: run { throw IllegalStateException("No such set $parentSetId") }
         }
     }
 
-    private fun findSegment(segmentId: Long): MutableChild? {
-        val stack = ArrayDeque<MutableChild>()
-        workout?.let { stack.addAll(it.children) }
+    private fun findSet(segmentId: Long) : SegmentInterface.Set {
+        when (val segment = findSegment(segmentId)) {
+            null ->
+                throw IllegalStateException("No such segment $segmentId")
+            !is SegmentInterface.Set ->
+                throw IllegalStateException("Segment $segmentId is not a set")
+            else ->
+                return segment
+        }
+    }
 
+    private fun findPeriod(segmentId: Long) : SegmentInterface.Period {
+        when (val segment = findSegment(segmentId)) {
+            null ->
+                throw IllegalStateException("No such segment $segmentId")
+            !is SegmentInterface.Period ->
+                throw IllegalStateException("Segment $segmentId is not a period")
+            else ->
+                return segment
+        }
+    }
+
+    private fun findSegment(segmentId: Long) : SegmentInterface? {
+        val stack = ArrayDeque<SegmentInterface>()
+        stack.addAll(segmentTree.workout.children)
         while (stack.isNotEmpty()) {
             val segment = stack.removeLast()
             if (segment.segmentId == segmentId) {
                 return segment
             }
-            if (segment is MutableChildSet) {
+            if (segment is SegmentInterface.Set) {
                 stack.addAll(segment.children)
             }
         }
@@ -159,167 +152,8 @@ class WorkoutEditViewModel(
     }
 
     private fun publishFlatList() {
-        _workoutFlow.value = workout?.toImmutable()
-        _flatSegmentFlow.value = SegmentFlattener.flatten(workout)
-    }
-
-    // DB code
-
-    private suspend fun createWorkout() : MutableWorkout {
-        val workoutEntity = WorkoutEntity(
-            0,
-            "New Workout",
-            0,
-            1
-        )
-        val workoutId = workoutDao.insert(workoutEntity)
-        return loadWorkout(workoutId)
-    }
-
-    private suspend fun createSetEntity(set: MutableChildSet): Long {
-        val parent = set.parent
-        val workoutId = (parent as? MutableWorkout)?.id
-        val parentSegmentId = (parent as? MutableChildSet)?.segmentId
-        val sequence = parent.children.indexOf(set)
-
-        val segmentEntity =  SegmentEntity(
-            0,
-            parentSegmentId,
-            workoutId,
-            set.repeatCount,
-            null,
-            null,
-            sequence
-        )
-        return withContext(Dispatchers.IO) {
-            segmentDao.insert(segmentEntity)
-        }
-    }
-
-    private suspend fun createPeriodEntity(period: MutablePeriod): Long {
-        val parent = period.parent
-        val workoutId = (parent as? MutableWorkout)?.id
-        val parentSegmentId = (parent as? MutableChildSet)?.segmentId
-        val sequence = parent.children.indexOf(period)
-
-        val segmentEntity = SegmentEntity(
-            0,
-            parentSegmentId,
-            workoutId,
-            null,
-            period.name,
-            period.duration,
-            sequence
-        )
-        return withContext(Dispatchers.IO) {
-            val id = segmentDao.insert(segmentEntity)
-            period.segmentId = id
-            id
-        }
-    }
-
-    private suspend fun updateWorkoutEntity(workout: MutableWorkout) {
-        val workoutEntity = WorkoutEntity(
-            workout.id,
-            workout.name,
-            workout.totalDuration,
-            workout.repeatCount
-        )
-        return withContext(Dispatchers.IO) {
-            workoutDao.update(workoutEntity)
-        }
-    }
-
-    private suspend fun updateSetEntity(set: MutableChildSet) {
-        val parent = set.parent
-        val workoutId = (parent as? MutableWorkout)?.id
-        val parentSegmentId = (parent as? MutableChildSet)?.segmentId
-        val sequence = parent.children.indexOf(set)
-
-        val segmentEntity =  SegmentEntity(
-            set.segmentId,
-            parentSegmentId,
-            workoutId,
-            set.repeatCount,
-            null,
-            null,
-            sequence
-        )
-        withContext(Dispatchers.IO) {
-            segmentDao.update(segmentEntity)
-        }
-    }
-
-    private suspend fun updatePeriodEntity(period: MutablePeriod) {
-        val parent = period.parent
-        val workoutId = (parent as? MutableWorkout)?.id
-        val parentSegmentId = (parent as? MutableChildSet)?.segmentId
-        val sequence = parent.children.indexOf(period)
-
-        val segmentEntity = SegmentEntity(
-            period.segmentId,
-            parentSegmentId,
-            workoutId,
-            null,
-            period.name,
-            period.duration,
-            sequence
-        )
-        withContext(Dispatchers.IO) {
-            segmentDao.insert(segmentEntity)
-        }
-    }
-
-    private suspend fun deleteSegmentEntity(segment: MutableChild) {
-        withContext(Dispatchers.IO) {
-            segmentDao.delete(segment.segmentId)
-            segment.parent.children.forEachIndexed { index, segment ->
-                segmentDao.updateSequence(segment.segmentId, index)
-            }
-        }
-    }
-
-    private suspend fun loadWorkout(workoutId: Long) : MutableWorkout {
-        return workoutDao.lookupWorkout(workoutId)?.let { dbWorkout ->
-            MutableWorkout(
-                dbWorkout.id,
-                dbWorkout.name,
-                dbWorkout.repeatCount
-            ).apply {
-                setChildren(loadWorkoutChildren(this))
-            }
-        } ?: throw IllegalStateException("No such workout $workoutId")
-    }
-
-    private suspend fun loadWorkoutChildren(workout: MutableWorkout) : List<MutableChild> {
-        val dbSegments = segmentDao.segmentsByWorkout(workout.id)
-        return loadChildren(workout, dbSegments)
-    }
-
-    private suspend fun loadSegmentChildren(set: MutableChildSet) : List<MutableChild> {
-        val dbSegments = segmentDao.segmentsByParent(set.segmentId)
-        return loadChildren(set, dbSegments)
-    }
-
-    private suspend fun loadChildren(parent: MutableParent, dbSegments: List<SegmentEntity>) : List<MutableChild> {
-        return dbSegments.map { segment ->
-            segment.repeatCount?.let { repeatCount ->
-                MutableChildSet(
-                    segment.id,
-                    parent,
-                    repeatCount,
-                ).apply {
-                    setChildren(loadSegmentChildren(this))
-                }
-            } ?: run {
-                MutablePeriod(
-                    segment.id,
-                    parent,
-                    segment.name ?: "",
-                    segment.duration ?: 0,
-                )
-            }
-        }
+        _workoutFlow.value = ImmutableWorkout(segmentTree.workout)
+        _flatSegmentFlow.value = SegmentFlattener.flatten(segmentTree.workout)
     }
 
     private class ImmutableWorkout(
@@ -327,55 +161,12 @@ class WorkoutEditViewModel(
         override val name: String,
         override val repeatCount: Int,
         override val totalDuration: Int,
-    ): WorkoutInterface
-
-    private interface MutableParent : SegmentInterface {
-        val children : MutableList<MutableChild>
-    }
-
-    private interface MutableChild : SegmentInterface {
-        override val segmentId: Long
-        val parent: MutableParent
-    }
-
-    private class MutableWorkout(
-        override val id: Long,
-        override var name: String,
-        override var repeatCount: Int
-    ) : WorkoutInterface, MutableParent, SegmentInterface.Set {
-        override val segmentId: Long?
-            get() = null
-        override val children = mutableListOf<MutableChild>()
-        override val totalDuration: Int
-            get() = children.sumOf { it.totalDuration } * repeatCount
-        fun setChildren(newChildren: List<MutableChild>) {
-            children.clear()
-            children.addAll(newChildren)
-        }
-
-        fun toImmutable() = ImmutableWorkout(id, name, repeatCount, totalDuration)
-    }
-
-    private class MutableChildSet(
-        override var segmentId: Long,
-        override var parent: MutableParent,
-        override var repeatCount: Int,
-    ): SegmentInterface.ChildSet, MutableParent, MutableChild {
-        override val children = mutableListOf<MutableChild>()
-        override val totalDuration: Int
-            get() = children.sumOf { it.totalDuration } * repeatCount
-        fun setChildren(newChildren: List<MutableChild>) {
-            children.clear()
-            children.addAll(newChildren)
-        }
-    }
-
-    private class MutablePeriod(
-        override var segmentId: Long,
-        override var parent: MutableParent,
-        override var name: String,
-        override var duration: Int,
-    ) : SegmentInterface.Period, MutableChild {
-        override val totalDuration: Int get() = duration
+    ): WorkoutInterface {
+        constructor(workout: SegmentInterface.Workout) : this(
+            workout.workoutId,
+            workout.name,
+            workout.repeatCount,
+            workout.totalDuration
+        )
     }
 }
