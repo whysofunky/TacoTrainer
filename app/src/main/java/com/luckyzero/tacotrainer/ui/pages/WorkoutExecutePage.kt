@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -29,6 +30,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.luckyzero.tacotrainer.R
 import com.luckyzero.tacotrainer.database.DbAccess
 import com.luckyzero.tacotrainer.repositories.WorkoutTimer
 import com.luckyzero.tacotrainer.ui.navigation.WorkoutExecute
@@ -36,6 +41,7 @@ import com.luckyzero.tacotrainer.ui.utils.UIUtils
 import com.luckyzero.tacotrainer.ui.utils.visibility
 import com.luckyzero.tacotrainer.viewModels.WorkoutExecuteViewModel
 import java.util.concurrent.TimeUnit
+import kotlin.reflect.jvm.internal.impl.descriptors.Visibilities.Local
 
 private data class ColorTheme(
     val background: Color,
@@ -75,7 +81,7 @@ private const val TAG = "WorkoutExecutePage"
 
 private const val EFFECT_INITIAL_LAUNCH = "InitialLaunch"
 
-private data class ExecuteContext(
+private data class WorkoutExecuteContext(
     val navHostController: NavHostController,
     val viewModel: WorkoutExecuteViewModel
 )
@@ -85,12 +91,21 @@ fun WorkoutExecutePage(args: WorkoutExecute,
                        navHostController: NavHostController,
                        modifier: Modifier
 ) {
+    val context = LocalContext.current
+    //val workManager = WorkManager.getInstance(context)
+    //val workRequest = OneTimeWorkRequestBuilder<TimerWorker>()
+    //    .setInputData(Data.Builder().putLong("id", args.workoutId).build())
+
+
+    // TODO: Put the timer implementation into the Worker, and then get info from it with
+    // an api like this:
+    // workManager.getWorkInfosFlow()
     val dbAccess = DbAccess(LocalContext.current)
     val viewModel = viewModel { WorkoutExecuteViewModel(args.workoutId, dbAccess) }
     LaunchedEffect(EFFECT_INITIAL_LAUNCH) {
         viewModel.start()
     }
-    val executeContext = ExecuteContext(navHostController, viewModel)
+    val executeContext = WorkoutExecuteContext(navHostController, viewModel)
     Column(modifier = Modifier.fillMaxSize().background(color = currentTheme.background)) {
         WorkoutHeader(executeContext)
         Spacer(modifier = Modifier.weight(1f))
@@ -101,7 +116,7 @@ fun WorkoutExecutePage(args: WorkoutExecute,
 }
 
 @Composable
-private fun WorkoutHeader(executeContext: ExecuteContext) {
+private fun WorkoutHeader(executeContext: WorkoutExecuteContext) {
     val workout by
         executeContext.viewModel.workoutFlow.collectAsStateWithLifecycle(null)
     val totalDurationMs by
@@ -128,7 +143,11 @@ private fun WorkoutHeader(executeContext: ExecuteContext) {
                 UIUtils.millisToElapsedSeconds(elapsedMs ?: 0L)
             )
             Text(
-                text = "$elapsedTimeStr of $totalDurationStr",
+                text = stringResource(
+                    R.string.workout_elapsed_and_duration,
+                    elapsedTimeStr,
+                    totalDurationStr
+                ),
                 textAlign = TextAlign.Center,
                 fontSize = 24.sp,
                 color = currentTheme.secondary,
@@ -138,7 +157,7 @@ private fun WorkoutHeader(executeContext: ExecuteContext) {
 }
 
 @Composable
-private fun CurrentPeriodInfo(executeContext: ExecuteContext) {
+private fun CurrentPeriodInfo(executeContext: WorkoutExecuteContext) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         PeriodName(executeContext)
         PeriodState(executeContext)
@@ -147,7 +166,7 @@ private fun CurrentPeriodInfo(executeContext: ExecuteContext) {
 }
 
 @Composable
-private fun PeriodName(executeContext: ExecuteContext) {
+private fun PeriodName(executeContext: WorkoutExecuteContext) {
     val instance by
         executeContext.viewModel.currentPeriodFlow.collectAsStateWithLifecycle(null)
     Text(
@@ -160,7 +179,7 @@ private fun PeriodName(executeContext: ExecuteContext) {
 }
 
 @Composable
-private fun PeriodState(executeContext: ExecuteContext) {
+private fun PeriodState(executeContext: WorkoutExecuteContext) {
     val remainDurationValue by
         executeContext.viewModel.periodRemainTimeMsFlow.collectAsStateWithLifecycle(null)
     val periodInstanceValue by
@@ -182,7 +201,13 @@ private fun PeriodState(executeContext: ExecuteContext) {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(8.dp),
             )
-            val repStr = setInstance?.let { "${setInstance.rep} of ${setInstance.set.repeatCount}" } ?: ""
+            val repStr = setInstance?.let {
+                stringResource(
+                    R.string.set_rep_and_count,
+                    setInstance.rep,
+                    setInstance.set.repeatCount,
+                    )
+            } ?: ""
             Text(
                 text = repStr,
                 fontSize = 24.sp,
@@ -201,12 +226,12 @@ private fun PeriodState(executeContext: ExecuteContext) {
 }
 
 @Composable
-private fun PeriodNotes(executeContext: ExecuteContext) {
+private fun PeriodNotes(executeContext: WorkoutExecuteContext) {
 
 }
 
 @Composable
-private fun ButtonBar(executeContext: ExecuteContext) {
+private fun ButtonBar(executeContext: WorkoutExecuteContext) {
     val state by executeContext.viewModel.stateFlow.collectAsStateWithLifecycle()
     Row(
         horizontalArrangement = Arrangement.Center,
@@ -239,7 +264,7 @@ private fun ButtonBar(executeContext: ExecuteContext) {
 
 
 @Composable
-private fun StartButton(executeContext: ExecuteContext) {
+private fun StartButton(executeContext: WorkoutExecuteContext) {
     Button(
         colors = ButtonColors(containerColor = currentTheme.colorless,
             contentColor = currentTheme.contrast,
@@ -251,7 +276,7 @@ private fun StartButton(executeContext: ExecuteContext) {
         }
     ) {
         Text(
-            text = "Start",
+            text = stringResource(R.string.button_start),
             fontSize=20.sp,
             fontWeight = FontWeight.Bold,
             )
@@ -259,7 +284,7 @@ private fun StartButton(executeContext: ExecuteContext) {
 }
 
 @Composable
-private fun PauseButton(executeContext: ExecuteContext) {
+private fun PauseButton(executeContext: WorkoutExecuteContext) {
     Button(
         colors = ButtonColors(containerColor = currentTheme.colorless,
             contentColor = currentTheme.contrast,
@@ -271,7 +296,7 @@ private fun PauseButton(executeContext: ExecuteContext) {
         }
     ) {
         Text(
-            text = "Pause",
+            text = stringResource(R.string.button_pause),
             fontSize=20.sp,
             fontWeight = FontWeight.Bold
         )
@@ -279,7 +304,7 @@ private fun PauseButton(executeContext: ExecuteContext) {
 }
 
 @Composable
-private fun ResumeButton(executeContext: ExecuteContext) {
+private fun ResumeButton(executeContext: WorkoutExecuteContext) {
     Button(
         colors = ButtonColors(containerColor = currentTheme.colorless,
             contentColor = currentTheme.contrast,
@@ -291,7 +316,7 @@ private fun ResumeButton(executeContext: ExecuteContext) {
         }
     ) {
         Text(
-            text = "Resume",
+            text = stringResource(R.string.button_resume),
             fontSize=20.sp,
             fontWeight = FontWeight.Bold,
         )
@@ -299,7 +324,7 @@ private fun ResumeButton(executeContext: ExecuteContext) {
 }
 
 @Composable
-private fun EndButton(executeContext: ExecuteContext) {
+private fun EndButton(executeContext: WorkoutExecuteContext) {
     Button(
         colors = ButtonColors(containerColor = currentTheme.colorless,
             contentColor = currentTheme.contrast,
@@ -312,7 +337,7 @@ private fun EndButton(executeContext: ExecuteContext) {
         }
     ) {
         Text(
-            text = "End",
+            text = stringResource(R.string.button_end_workout),
             fontSize=20.sp,
             fontWeight = FontWeight.Bold
         )
@@ -321,5 +346,9 @@ private fun EndButton(executeContext: ExecuteContext) {
 
 @Composable
 fun FinishedBanner() {
-    Text(text = "Workout Finished", color = currentTheme.colorless, fontSize=20.sp, fontWeight = FontWeight.Bold)
+    Text(text = stringResource(R.string.workout_finished),
+        color = currentTheme.colorless,
+        fontSize=20.sp,
+        fontWeight = FontWeight.Bold
+    )
 }

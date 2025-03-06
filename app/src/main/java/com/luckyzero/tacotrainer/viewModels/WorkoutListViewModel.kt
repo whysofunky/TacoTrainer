@@ -43,6 +43,12 @@ class WorkoutListViewModel(dbAccess: DbAccess) : ViewModel() {
         }
     }
 
+    fun deleteWorkout(workoutId: Long) {
+        viewModelScope.launch {
+            workoutDao.delete(workoutId)
+        }
+    }
+
     private fun startLoadingWorkouts() {
         viewModelScope.launch {
             workoutDao.getAllWorkoutsFlow().collect { databaseList ->

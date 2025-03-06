@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -31,18 +32,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.luckyzero.tacotrainer.R
 import com.luckyzero.tacotrainer.database.DbAccess
 import com.luckyzero.tacotrainer.models.FlatSegmentInterface
 import com.luckyzero.tacotrainer.models.WorkoutInterface
@@ -58,15 +61,14 @@ import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 
 private const val TAG = "WorkoutEditScreen"
-private const val INDENT_DEPTH = 12
-private const val DIVIDER_HEIGHT = 4
+private const val TREE_SPACER_WIDTH = 4
+private const val TREE_INDICATOR_WIDTH = 6
+private const val TREE_INDICATOR_HEIGHT = 6
 private const val DEFAULT_ROW_HEIGHT = 48
-private val indentColor = Color.Green
+private const val TREE_INDICATOR_CORNER_SIZE = 10
+private val INDENT_COLOR = Color(0xFF2060C0)
 
-
-
-
-private data class SegmentListContext(
+private data class WorkoutEditContext(
     val viewModel: WorkoutEditViewModel,
     val selectedItem: MutableState<Long?>,
     val coroutineScope: CoroutineScope
@@ -137,7 +139,9 @@ private fun EditablePageHeading(
             singleLine = true,
             textStyle = TextStyle(fontSize = 20.sp),
             placeholder = {
-                Text(text = "Workout name", color = Color.Blue)
+                Text(text = stringResource(R.string.placeholder_workout_name),
+                    color = Color.Blue
+                )
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(
@@ -160,51 +164,51 @@ private fun SegmentList(viewModel: WorkoutEditViewModel, navController: NavHostC
     val flatSegments by viewModel.flatSegmentFlow.collectAsStateWithLifecycle(emptyList())
     val selectedItem = remember { mutableStateOf<Long?>(null) }
     val coroutineScope = rememberCoroutineScope()
-    val segmentListContext = SegmentListContext(viewModel, selectedItem, coroutineScope)
+    val workoutEditContext = WorkoutEditContext(viewModel, selectedItem, coroutineScope)
     LazyColumn(modifier = Modifier.padding(12.dp)) {
         items(flatSegments.size) {
-            SegmentItem(flatSegments[it], segmentListContext)
+            SegmentItem(flatSegments[it], workoutEditContext)
         }
     }
 }
 
 @Composable
 private fun SegmentItem(flatSegmentItem: FlatSegmentInterface,
-                        segmentListContext: SegmentListContext) {
+                        workoutEditContext: WorkoutEditContext) {
     when (flatSegmentItem) {
         is FlatSegmentInterface.Set ->
-            WorkoutSetItem(flatSegmentItem, segmentListContext)
+            WorkoutSetItem(flatSegmentItem, workoutEditContext)
         is FlatSegmentInterface.Period ->
-            WorkoutPeriodItem(flatSegmentItem, segmentListContext)
+            WorkoutPeriodItem(flatSegmentItem, workoutEditContext)
         is FlatSegmentInterface.SetFooter ->
-            WorkoutSetFooterItem(flatSegmentItem, segmentListContext)
+            WorkoutSetFooterItem(flatSegmentItem, workoutEditContext)
     }
 }
 
 @Composable
 private fun WorkoutSetItem(set: FlatSegmentInterface.Set,
-                           segmentListContext: SegmentListContext) {
-    val indent = (set.depth + 1) * INDENT_DEPTH
+                           workoutEditContext: WorkoutEditContext) {
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(segmentListContext.selectedItem.value == set.id) {
-        if (segmentListContext.selectedItem.value == set.id) {
+    LaunchedEffect(workoutEditContext.selectedItem.value == set.id) {
+        if (workoutEditContext.selectedItem.value == set.id) {
             focusRequester.requestFocus()
         }
     }
-    Column {
-        Box(modifier = Modifier.background(indentColor).fillMaxWidth().height(DIVIDER_HEIGHT.dp))
-        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-            Box(
-                modifier = Modifier
-                    .width(indent.dp)
-                    .fillMaxHeight(1f)
-                    .background(color = Color.Green)
+    Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+        TreeIndicator(set.depth + 1, roundedTop = true)
+        Column {
+            Box(modifier = Modifier
+                .fillMaxWidth()
+                .height(TREE_INDICATOR_HEIGHT.dp)
+                .background(INDENT_COLOR)
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            if (segmentListContext.selectedItem.value == set.id) {
-                EditableWorkoutSetItem(set, segmentListContext, focusRequester)
-            } else {
-                StaticWorkoutSetItem(set, segmentListContext)
+            Row {
+                Spacer(modifier = Modifier.width(TREE_SPACER_WIDTH.dp))
+                if (workoutEditContext.selectedItem.value == set.id) {
+                    EditableWorkoutSetItem(set, workoutEditContext, focusRequester)
+                } else {
+                    StaticWorkoutSetItem(set, workoutEditContext)
+                }
             }
         }
     }
@@ -212,28 +216,26 @@ private fun WorkoutSetItem(set: FlatSegmentInterface.Set,
 
 @Composable
 private fun StaticWorkoutSetItem(set: FlatSegmentInterface.Set,
-                                 segmentListContext: SegmentListContext) {
+                                 workoutEditContext: WorkoutEditContext) {
     Row(verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .height(DEFAULT_ROW_HEIGHT.dp)
-            .clickable { segmentListContext.selectedItem.value = set.id }
+            .clickable { workoutEditContext.selectedItem.value = set.id }
     ) {
         if (set.repeatCount == 1 && set.depth == 0) {
-            Text(text = "Main set", fontSize = 20.sp)
+            Text(text = stringResource(R.string.heading_main_set), fontSize = 20.sp)
         } else {
-            Text(text = "Repeat: ", fontSize = 20.sp)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(text = set.repeatCount.toString(),
+            Text(
+                text = stringResource(R.string.heading_repeat_count, set.repeatCount),
                 fontSize = 20.sp,
-                textAlign = TextAlign.End,
-                modifier = Modifier.width(96.dp))
+            )
         }
     }
 }
 
 @Composable
 private fun EditableWorkoutSetItem(set: FlatSegmentInterface.Set,
-                                   segmentListContext: SegmentListContext,
+                                   workoutEditContext: WorkoutEditContext,
                                    focusRequester: FocusRequester) {
     val repeatCount = rememberSaveable { mutableIntStateOf(set.repeatCount) }
 
@@ -241,9 +243,9 @@ private fun EditableWorkoutSetItem(set: FlatSegmentInterface.Set,
         Row(verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .height(DEFAULT_ROW_HEIGHT.dp)
-                .clickable { segmentListContext.selectedItem.value = null }
+                .clickable { workoutEditContext.selectedItem.value = null }
         ) {
-            Text(text = "Repeat: ", fontSize = 20.sp)
+            Text(text = stringResource(R.string.heading_repeat), fontSize = 20.sp)
             Spacer(modifier = Modifier.width(8.dp))
             CountField(repeatCount,
                 textStyle = TextStyle(fontSize = 20.sp),
@@ -253,25 +255,27 @@ private fun EditableWorkoutSetItem(set: FlatSegmentInterface.Set,
         }
         Row {
             Button(onClick = {
-                segmentListContext.selectedItem.value = null
+                workoutEditContext.selectedItem.value = null
                 if (set.id == 0L) {
-                    segmentListContext.viewModel.updateWorkout(null, repeatCount.intValue)
+                    workoutEditContext.viewModel.updateWorkout(null, repeatCount.intValue)
                 } else {
-                    segmentListContext.viewModel.updateSet(set.id, repeatCount.intValue)
+                    workoutEditContext.viewModel.updateSet(set.id, repeatCount.intValue)
                 }
-            }) { Text(text = "Save") }
-            Button(onClick = {
-                segmentListContext.selectedItem.value = null
             }) {
-                Text(text = "Discard")
+                Text(text = stringResource(R.string.button_save))
+            }
+            Button(onClick = {
+                workoutEditContext.selectedItem.value = null
+            }) {
+                Text(text = stringResource(R.string.button_discard))
             }
             if (set.id != 0L) {
                 Spacer(modifier = Modifier.weight(1f))
                 Button(onClick = {
-                    segmentListContext.selectedItem.value = null
-                    segmentListContext.viewModel.deleteSet(set.id)
+                    workoutEditContext.selectedItem.value = null
+                    workoutEditContext.viewModel.deleteSet(set.id)
                 }) {
-                    Text(text = "Delete")
+                    Text(text = stringResource(R.string.button_delete))
                 }
             }
         }
@@ -280,27 +284,21 @@ private fun EditableWorkoutSetItem(set: FlatSegmentInterface.Set,
 
 @Composable
 private fun WorkoutPeriodItem(period: FlatSegmentInterface.Period,
-                              segmentListContext: SegmentListContext) {
-    val indent = period.depth * INDENT_DEPTH
+                              workoutEditContext: WorkoutEditContext) {
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(segmentListContext.selectedItem.value == period.id) {
-        if (segmentListContext.selectedItem.value == period.id) {
+    LaunchedEffect(workoutEditContext.selectedItem.value == period.id) {
+        if (workoutEditContext.selectedItem.value == period.id) {
             focusRequester.requestFocus()
         }
     }
     Column {
         Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-            Box(
-                modifier = Modifier
-                    .width(indent.dp)
-                    .fillMaxHeight(1f)
-                    .background(color = Color.Green)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            if (segmentListContext.selectedItem.value == period.id) {
-                EditablePeriodItem(period, segmentListContext, focusRequester)
+            TreeIndicator(period.depth)
+            Spacer(modifier = Modifier.width(TREE_SPACER_WIDTH.dp))
+            if (workoutEditContext.selectedItem.value == period.id) {
+                EditablePeriodItem(period, workoutEditContext, focusRequester)
             } else {
-                StaticPeriodItem(period, segmentListContext)
+                StaticPeriodItem(period, workoutEditContext)
             }
         }
     }
@@ -308,8 +306,8 @@ private fun WorkoutPeriodItem(period: FlatSegmentInterface.Period,
 
 @Composable
 private fun StaticPeriodItem(period: FlatSegmentInterface.Period,
-                             segmentListContext: SegmentListContext) {
-    Column(modifier = Modifier.clickable { segmentListContext.selectedItem.value = period.id }) {
+                             workoutEditContext: WorkoutEditContext) {
+    Column(modifier = Modifier.clickable { workoutEditContext.selectedItem.value = period.id }) {
         Row(verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.height(DEFAULT_ROW_HEIGHT.dp)
         ) {
@@ -328,7 +326,7 @@ private fun StaticPeriodItem(period: FlatSegmentInterface.Period,
 
 @Composable
 private fun EditablePeriodItem(period: FlatSegmentInterface.Period,
-                               segmentListContext: SegmentListContext,
+                               workoutEditContext: WorkoutEditContext,
                                focusRequester: FocusRequester) {
     val name = rememberSaveable { mutableStateOf(period.name) }
     val duration = rememberSaveable { mutableIntStateOf(period.duration) }
@@ -350,20 +348,20 @@ private fun EditablePeriodItem(period: FlatSegmentInterface.Period,
         }
         Row {
             Button(onClick = {
-                segmentListContext.selectedItem.value = null
-                segmentListContext.viewModel.updatePeriod(period.id, name.value, duration.intValue)
-            }) { Text(text = "Save") }
+                workoutEditContext.selectedItem.value = null
+                workoutEditContext.viewModel.updatePeriod(period.id, name.value, duration.intValue)
+            }) { Text(text = stringResource(R.string.button_save)) }
             Button(onClick = {
-                segmentListContext.selectedItem.value = null
+                workoutEditContext.selectedItem.value = null
             }) {
-                Text(text = "Discard")
+                Text(text = stringResource(R.string.button_discard))
             }
             Spacer(modifier = Modifier.weight(1f))
             Button(onClick = {
-                segmentListContext.selectedItem.value = null
-                segmentListContext.viewModel.deletePeriod(period.id)
+                workoutEditContext.selectedItem.value = null
+                workoutEditContext.viewModel.deletePeriod(period.id)
             }) {
-                Text(text = "Delete")
+                Text(text = stringResource(R.string.button_delete))
             }
         }
     }
@@ -371,60 +369,85 @@ private fun EditablePeriodItem(period: FlatSegmentInterface.Period,
 
 @Composable
 private fun WorkoutSetFooterItem(setFooter: FlatSegmentInterface.SetFooter,
-                                 segmentListContext: SegmentListContext) {
-    val indent = (setFooter.depth + 1) * INDENT_DEPTH
-    Column {
-        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-            Box(
-                modifier = Modifier
-                    .width(indent.dp)
-                    .fillMaxHeight(1f)
-                    .background(color = Color.Green)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            if (setFooter.id == segmentListContext.selectedItem.value) {
-                EditableWorkoutSetFooterItem(setFooter, segmentListContext)
-            } else {
-                StaticWorkoutSetFooterItem(setFooter, segmentListContext)
+                                 workoutEditContext: WorkoutEditContext) {
+    Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+        TreeIndicator(setFooter.depth + 1, roundedBottom = true)
+        Column {
+            Row {
+                Spacer(modifier = Modifier.width(TREE_SPACER_WIDTH.dp))
+                if (setFooter.id == workoutEditContext.selectedItem.value) {
+                    EditableWorkoutSetFooterItem(setFooter, workoutEditContext)
+                } else {
+                    StaticWorkoutSetFooterItem(setFooter, workoutEditContext)
+                }
             }
+            Box(modifier = Modifier
+                .fillMaxWidth()
+                .height(TREE_INDICATOR_HEIGHT.dp)
+                .background(INDENT_COLOR)
+            )
         }
-        Box(modifier = Modifier.background(indentColor).fillMaxWidth().height(DIVIDER_HEIGHT.dp))
     }
 }
 
 @Composable
 private fun StaticWorkoutSetFooterItem(setFooter: FlatSegmentInterface.SetFooter,
-                                       segmentListContext: SegmentListContext) {
-    Box(modifier = Modifier.background(Color.White).fillMaxWidth().height(DIVIDER_HEIGHT.dp))
+                                       workoutEditContext: WorkoutEditContext) {
+    Box(modifier = Modifier.background(Color.White).fillMaxWidth().height(TREE_INDICATOR_HEIGHT.dp))
 }
 
 
 @Composable
 private fun EditableWorkoutSetFooterItem(setFooter: FlatSegmentInterface.SetFooter,
-                                         segmentListContext: SegmentListContext) {
+                                         workoutEditContext: WorkoutEditContext) {
     Row {
         Spacer(modifier = Modifier.weight(1f))
         Button(onClick = {
-            val setIdFlow = segmentListContext.viewModel.createSet(setFooter.id)
-            segmentListContext.coroutineScope.launch {
+            val setIdFlow = workoutEditContext.viewModel.createSet(setFooter.id)
+            workoutEditContext.coroutineScope.launch {
                 setIdFlow.take(1).collect {
-                    segmentListContext.selectedItem.value = it
+                    workoutEditContext.selectedItem.value = it
                 }
             }
         }, modifier = Modifier.padding(start = 8.dp)) {
-            Text(text = "Add Set", fontSize = 16.sp)
+            Text(text = stringResource(R.string.button_add_set), fontSize = 16.sp)
         }
         Button(onClick = {
-            val periodIdFlow = segmentListContext.viewModel.createPeriod(setFooter.id)
-            segmentListContext.coroutineScope.launch {
+            val periodIdFlow = workoutEditContext.viewModel.createPeriod(setFooter.id)
+            workoutEditContext.coroutineScope.launch {
                 periodIdFlow.take(1).collect {
-                    segmentListContext.selectedItem.value = it
+                    workoutEditContext.selectedItem.value = it
                 }
             }
         }, modifier = Modifier.padding(start = 8.dp)) {
-            Text(text = "Add Period", fontSize = 16.sp)
+            Text(text = stringResource(R.string.button_add_period), fontSize = 16.sp)
         }
     }
 }
 
-
+@Composable
+private fun TreeIndicator(
+    depth: Int,
+    roundedTop: Boolean = false,
+    roundedBottom: Boolean = false
+) {
+    for (i in 1 until depth) {
+        Box(
+            modifier = Modifier
+                .width(TREE_INDICATOR_WIDTH.dp)
+                .fillMaxHeight(1f)
+                .background(INDENT_COLOR)
+        )
+        Spacer(modifier = Modifier.width(TREE_SPACER_WIDTH.dp))
+    }
+    Box(
+        modifier = Modifier
+            .width(TREE_INDICATOR_WIDTH.dp)
+            .fillMaxHeight(1f)
+            .clip(RoundedCornerShape(
+                topStart = if (roundedTop) TREE_INDICATOR_CORNER_SIZE.dp else 0.dp,
+                bottomStart = if (roundedBottom) TREE_INDICATOR_CORNER_SIZE.dp else 0.dp
+            ))
+            .background(INDENT_COLOR)
+    )
+}
