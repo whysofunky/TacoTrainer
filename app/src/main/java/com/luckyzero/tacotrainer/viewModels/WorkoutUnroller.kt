@@ -28,7 +28,7 @@ object  WorkoutUnroller{
         val result = mutableListOf<PeriodInstance>()
         var startOffsetMs: Long = initialOffsetMs
         for (rep in 0 until set.repeatCount) {
-            val setInstance = SetInstance(set, rep)
+            val setInstance = SetInstance(set, rep + 1)
             for (child in set.children) {
                 when (child) {
                     is SegmentInterface.Period -> {

@@ -18,6 +18,8 @@ import java.util.concurrent.TimeUnit
 
 private const val TAG = "WorkoutTimer"
 
+private const val MAX_TICK_DELAY = 16L
+
 // This is a repository, not a viewModel, because we might want the timer to keep running
 // even if the user dismisses the UI.
 // Actually it should be part of a service.
@@ -158,11 +160,10 @@ class WorkoutTimer(
     }
 
     private suspend fun runTicks() {
-        while (running()) {
-            val timeMs = clock.elapsedRealtime()
-            val timeUntilNextSecondMs = onTimeUpdate(timeMs)
-            delay(timeUntilNextSecondMs)
-        }
+        do {
+            val timeUntilNextEvent = onTimeUpdate(clock.elapsedRealtime())
+            if (running()) delay(timeUntilNextEvent.coerceAtMost(MAX_TICK_DELAY))
+        } while (running())
         _stateFlow.value = State.FINISHED
     }
 

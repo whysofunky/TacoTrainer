@@ -1,24 +1,28 @@
 package com.luckyzero.tacotrainer.ui.pages
 
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,6 +33,7 @@ import com.luckyzero.tacotrainer.database.DbAccess
 import com.luckyzero.tacotrainer.repositories.WorkoutTimer
 import com.luckyzero.tacotrainer.ui.navigation.WorkoutExecute
 import com.luckyzero.tacotrainer.ui.utils.UIUtils
+import com.luckyzero.tacotrainer.ui.utils.visibility
 import com.luckyzero.tacotrainer.viewModels.WorkoutExecuteViewModel
 import java.util.concurrent.TimeUnit
 
@@ -44,9 +49,9 @@ private data class ColorTheme(
 
 private val redTheme = ColorTheme(
     background = Color(0xFFD08080),
-    primary = Color(0xFFC03030),
-    secondary = Color(0xFFC05050),
-    highlight = Color(0xFF600000),
+    primary = Color(0xFFB02020),
+    secondary = Color(0xFFC04040),
+    highlight = Color(0xFF600808),
     contrast = Color(0xFFC0C000),
     colorless = Color(0xFF101010),
     colorlessInverse = Color(0xFFF0F0F0)
@@ -62,13 +67,18 @@ private val greenTheme = ColorTheme(
     colorlessInverse = Color(0xFFF0F0F0)
 )
 
-private const val INITIAL_LAUNCH = "InitialLaunch"
 
 // TODO: This will ultimately come from the current period
 private val currentTheme = redTheme
 
-
 private const val TAG = "WorkoutExecutePage"
+
+private const val EFFECT_INITIAL_LAUNCH = "InitialLaunch"
+
+private data class ExecuteContext(
+    val navHostController: NavHostController,
+    val viewModel: WorkoutExecuteViewModel
+)
 
 @Composable
 fun WorkoutExecutePage(args: WorkoutExecute,
@@ -77,120 +87,148 @@ fun WorkoutExecutePage(args: WorkoutExecute,
 ) {
     val dbAccess = DbAccess(LocalContext.current)
     val viewModel = viewModel { WorkoutExecuteViewModel(args.workoutId, dbAccess) }
-    LaunchedEffect(INITIAL_LAUNCH) {
+    LaunchedEffect(EFFECT_INITIAL_LAUNCH) {
         viewModel.start()
     }
+    val executeContext = ExecuteContext(navHostController, viewModel)
     Column(modifier = Modifier.fillMaxSize().background(color = currentTheme.background)) {
-        WorkoutHeader(viewModel)
-        PeriodName(viewModel)
-        SetRepetition(viewModel)
-        RemainDuration(viewModel)
-        ButtonBar(viewModel)
+        WorkoutHeader(executeContext)
+        Spacer(modifier = Modifier.weight(1f))
+        CurrentPeriodInfo(executeContext)
+        Spacer(modifier = Modifier.weight(3f))
+        ButtonBar(executeContext)
     }
-
-
-    // workout name
-    // total duration remain / total duration
-    // segment name
-    // repetition / of repetition
-    // remain duration
-    // details ( HR range, watt range, gear range, etc.)
-    // pause, end workout buttons
 }
 
-
 @Composable
-fun WorkoutHeader(viewModel: WorkoutExecuteViewModel) {
-    val workout by viewModel.workoutFlow.collectAsStateWithLifecycle(null)
-    val totalDurationMs by viewModel.totalDurationMs.collectAsStateWithLifecycle(null)
-    val elapsedMs by viewModel.totalElapsedTimeMsFlow.collectAsStateWithLifecycle(null)
-    Column {
+private fun WorkoutHeader(executeContext: ExecuteContext) {
+    val workout by
+        executeContext.viewModel.workoutFlow.collectAsStateWithLifecycle(null)
+    val totalDurationMs by
+        executeContext.viewModel.totalDurationMs.collectAsStateWithLifecycle(null)
+    val elapsedMs by
+        executeContext.viewModel.totalElapsedTimeMsFlow.collectAsStateWithLifecycle(null)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(12.dp)
+    ) {
         Text(
             text = workout?.name ?: "",
             textAlign = TextAlign.Center,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
             color = currentTheme.primary,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
+            modifier = Modifier.fillMaxWidth().padding(12.dp)
         )
         Row(horizontalArrangement = Arrangement.Center) {
-            val totalDuration = totalDurationMs?.let {
-                UIUtils.formatDuration(UIUtils.millisToElapsedSeconds(it))
-            }
-            val elapsed = elapsedMs?.let {
-                UIUtils.formatDuration(UIUtils.millisToElapsedSeconds(it))
-            }
-            Text(
-                text = elapsed ?: "",
-                color = currentTheme.secondary,
+            val totalDurationStr = UIUtils.formatDuration(UIUtils.millisToElapsedSeconds(
+                totalDurationMs ?: 0L
+            ))
+            val elapsedTimeStr = UIUtils.formatDuration(
+                UIUtils.millisToElapsedSeconds(elapsedMs ?: 0L)
             )
-            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "of",
-                color = currentTheme.secondary,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = totalDuration ?: "",
+                text = "$elapsedTimeStr of $totalDurationStr",
+                textAlign = TextAlign.Center,
+                fontSize = 24.sp,
                 color = currentTheme.secondary,
             )
         }
     }
 }
 
+@Composable
+private fun CurrentPeriodInfo(executeContext: ExecuteContext) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        PeriodName(executeContext)
+        PeriodState(executeContext)
+        PeriodNotes(executeContext)
+    }
+}
 
 @Composable
-fun PeriodName(viewModel: WorkoutExecuteViewModel) {
-    val instance by viewModel.currentPeriodFlow.collectAsStateWithLifecycle(null)
+private fun PeriodName(executeContext: ExecuteContext) {
+    val instance by
+        executeContext.viewModel.currentPeriodFlow.collectAsStateWithLifecycle(null)
     Text(
-        text = instance?.period?.name ?: ""
+        text = instance?.period?.name ?: "",
+        fontSize = 36.sp,
+        fontWeight = FontWeight.Bold,
+        color = currentTheme.primary,
+        modifier = Modifier.padding(12.dp),
     )
 }
 
 @Composable
-fun SetRepetition(viewModel: WorkoutExecuteViewModel) {
-    val periodInstance by viewModel.currentPeriodFlow.collectAsStateWithLifecycle(null)
-    periodInstance?.set?.let { setInstance ->
-        Text(
-            text = "${(setInstance.rep + 1)} of ${setInstance.set.repeatCount}"
-        )
-    }
-}
+private fun PeriodState(executeContext: ExecuteContext) {
+    val remainDurationValue by
+        executeContext.viewModel.periodRemainTimeMsFlow.collectAsStateWithLifecycle(null)
+    val periodInstanceValue by
+    executeContext.viewModel.currentPeriodFlow.collectAsStateWithLifecycle(null)
 
-@Composable
-fun RemainDuration(viewModel: WorkoutExecuteViewModel) {
-    val remainDurationValue by viewModel.periodRemainTimeMsFlow.collectAsStateWithLifecycle(null)
-    val periodInstanceValue by viewModel.currentPeriodFlow.collectAsStateWithLifecycle(null)
-    remainDurationValue?.let { remainDurationMs ->
-        val remainDurationStr = UIUtils.formatDuration(UIUtils.millisToDurationSeconds(remainDurationMs))
-        Text(
-            text = remainDurationStr,
-            color = currentTheme.primary,
-            fontSize = 24.sp
-        )
-        periodInstanceValue?.period?.duration?.let { periodDuration ->
-            val periodDurationMs = TimeUnit.SECONDS.toMillis(periodDuration.toLong())
-            val periodCompleteness = (remainDurationMs.toFloat() / periodDurationMs.toFloat())
-            CircularProgressIndicator(
-                progress = { periodCompleteness }
+    val remainDurationMs = remainDurationValue ?: 0L
+    val period = periodInstanceValue?.period
+    val setInstance = periodInstanceValue?.set
+    val completeness = period?.duration?.let {
+        (remainDurationMs.toFloat() / (TimeUnit.SECONDS.toMillis(it.toLong()).toFloat()))
+    } ?: 1f
+
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = UIUtils.formatDuration(UIUtils.millisToDurationSeconds(remainDurationMs)),
+                color = currentTheme.highlight,
+                fontSize = 54.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(8.dp),
+            )
+            val repStr = setInstance?.let { "${setInstance.rep} of ${setInstance.set.repeatCount}" } ?: ""
+            Text(
+                text = repStr,
+                fontSize = 24.sp,
+                color = currentTheme.secondary,
+                modifier = Modifier.visibility(setInstance != null)
             )
         }
+        CircularProgressIndicator(
+            progress = { completeness },
+            strokeWidth = 12.dp,
+            trackColor = currentTheme.secondary,
+            color = currentTheme.highlight,
+            modifier = Modifier.width(250.dp).height(250.dp)
+        )
     }
 }
 
 @Composable
-fun ButtonBar(viewModel: WorkoutExecuteViewModel) {
-    val state by viewModel.stateFlow.collectAsStateWithLifecycle()
-    Row {
+private fun PeriodNotes(executeContext: ExecuteContext) {
+
+}
+
+@Composable
+private fun ButtonBar(executeContext: ExecuteContext) {
+    val state by executeContext.viewModel.stateFlow.collectAsStateWithLifecycle()
+    Row(
+        horizontalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .height(76.dp)
+            .fillMaxWidth()
+    ) {
         when (state) {
             WorkoutTimer.State.IDLE, WorkoutTimer.State.LOADED_WAITING -> {
-                StartButton(viewModel)
+                StartButton(executeContext)
+                Spacer(modifier = Modifier.width(8.dp))
+                EndButton(executeContext)
             }
             WorkoutTimer.State.LOADING_READY, WorkoutTimer.State.RUNNING -> {
-                PauseButton(viewModel)
+                PauseButton(executeContext)
+                Spacer(modifier = Modifier.width(8.dp))
+                EndButton(executeContext)
             }
             WorkoutTimer.State.PAUSED -> {
-                ResumeButton(viewModel)
+                ResumeButton(executeContext)
+                Spacer(modifier = Modifier.width(8.dp))
+                EndButton(executeContext)
             }
             WorkoutTimer.State.FINISHED -> {
                 FinishedBanner()
@@ -201,34 +239,87 @@ fun ButtonBar(viewModel: WorkoutExecuteViewModel) {
 
 
 @Composable
-fun StartButton(viewModel: WorkoutExecuteViewModel) {
-    Button(onClick = {
-        viewModel.start()
-    }) {
-        Text("State")
+private fun StartButton(executeContext: ExecuteContext) {
+    Button(
+        colors = ButtonColors(containerColor = currentTheme.colorless,
+            contentColor = currentTheme.contrast,
+            disabledContainerColor = currentTheme.colorlessInverse,
+            disabledContentColor = currentTheme.colorless,
+            ),
+        onClick = {
+            executeContext.viewModel.start()
+        }
+    ) {
+        Text(
+            text = "Start",
+            fontSize=20.sp,
+            fontWeight = FontWeight.Bold,
+            )
     }
 }
 
 @Composable
-fun PauseButton(viewModel: WorkoutExecuteViewModel) {
-    Button(onClick = {
-        viewModel.pause()
-    }) {
-        Text("Pause")
+private fun PauseButton(executeContext: ExecuteContext) {
+    Button(
+        colors = ButtonColors(containerColor = currentTheme.colorless,
+            contentColor = currentTheme.contrast,
+            disabledContainerColor = currentTheme.colorlessInverse,
+            disabledContentColor = currentTheme.colorless,
+        ),
+        onClick = {
+            executeContext.viewModel.pause()
+        }
+    ) {
+        Text(
+            text = "Pause",
+            fontSize=20.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
 @Composable
-fun ResumeButton(viewModel: WorkoutExecuteViewModel) {
-    Button(onClick = {
-        viewModel.resume()
-    }) {
-        Text("Resume")
+private fun ResumeButton(executeContext: ExecuteContext) {
+    Button(
+        colors = ButtonColors(containerColor = currentTheme.colorless,
+            contentColor = currentTheme.contrast,
+            disabledContainerColor = currentTheme.colorlessInverse,
+            disabledContentColor = currentTheme.colorless,
+        ),
+        onClick = {
+            executeContext.viewModel.resume()
+        }
+    ) {
+        Text(
+            text = "Resume",
+            fontSize=20.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
+@Composable
+private fun EndButton(executeContext: ExecuteContext) {
+    Button(
+        colors = ButtonColors(containerColor = currentTheme.colorless,
+            contentColor = currentTheme.contrast,
+            disabledContainerColor = currentTheme.colorlessInverse,
+            disabledContentColor = currentTheme.colorless,
+        ),
+        onClick = {
+            executeContext.viewModel.pause()
+            executeContext.navHostController.popBackStack()
+        }
+    ) {
+        Text(
+            text = "End",
+            fontSize=20.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
 
 @Composable
 fun FinishedBanner() {
-    Text("Workout Finished")
+    Text(text = "Workout Finished", color = currentTheme.colorless, fontSize=20.sp, fontWeight = FontWeight.Bold)
 }
