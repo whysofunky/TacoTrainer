@@ -4,7 +4,10 @@ Android app to help with interval training
 TODO
 
 General
- * Make strings resources
+ * Light and dark themes (everywhere except execute page)
+ * Back button in header
+ * Style navigation bar
+ * Style status bar
 
 Entry fields:
   * improve decorations
@@ -16,13 +19,13 @@ Entry fields:
 Edit page:
  * Animate item selection
  * Allow reordering
+ * Only allow one item selected at a time
  * Clean up layout, spacing, colors
  * Support colors
  * Support "skip in last rep"
  * Support additional data
 
 List page:
- * implement delete
  * improve UI
 
 Workout run page:
@@ -30,6 +33,7 @@ Workout run page:
 
 Workout timer
  * Make timer a service so that it can run offscreen
+ * Confirm dialog before end workout
  * Post notifications when running
  * Make sound on transitions
 
@@ -47,5 +51,5 @@ Period note types
  * FTP range (manual)
  * Target pace
  * Target speed
- * 
+ * Free form
 
