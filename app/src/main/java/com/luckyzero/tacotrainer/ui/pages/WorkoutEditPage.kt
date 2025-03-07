@@ -42,6 +42,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -56,6 +57,7 @@ import com.luckyzero.tacotrainer.ui.widgets.CountField
 import com.luckyzero.tacotrainer.ui.widgets.DurationField
 import com.luckyzero.tacotrainer.ui.widgets.NameField
 import com.luckyzero.tacotrainer.viewModels.WorkoutEditViewModel
+import com.luckyzero.tacotrainer.viewModels.WorkoutExecuteViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
@@ -78,9 +80,11 @@ private data class WorkoutEditContext(
 fun WorkoutEditPage(args: WorkoutEdit,
                     navHostController: NavHostController,
                     modifier: Modifier) {
-    val dbAccess = DbAccess(LocalContext.current)
-    val segmentTreeLoader = SegmentTreeLoader(dbAccess)
-    val viewModel = viewModel { WorkoutEditViewModel(args.workoutId, segmentTreeLoader) }
+    val viewModel: WorkoutEditViewModel =
+        hiltViewModel<WorkoutEditViewModel, WorkoutEditViewModel.Factory> { factory ->
+            factory.create(args.workoutId)
+        }
+
     Column {
         PageHeading(viewModel)
         SegmentList(viewModel, navHostController)

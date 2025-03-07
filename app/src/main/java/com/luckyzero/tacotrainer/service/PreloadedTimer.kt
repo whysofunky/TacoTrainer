@@ -1,0 +1,101 @@
+package com.luckyzero.tacotrainer.service
+
+import com.luckyzero.tacotrainer.models.PeriodInstanceInterface
+
+private const val TAG = "WorkoutTimer"
+
+class PreloadedTimer(
+    private val periodList: List<PeriodInstanceInterface>
+) {
+    enum class State {
+        IDLE,
+        RUNNING,
+        PAUSED,
+        FINISHED
+    }
+
+    var state : State = State.IDLE
+        private set
+    var startTimeMs : Long = 0
+        private set
+    var pausedStartTimeMs : Long? = null
+        private set
+    var pausedDurationMs : Long = 0
+        private set
+    var currentIdx: Int = 0
+        private set
+    var totalElapsedMs: Long = 0
+        private set
+    var periodRemainMs: Long = 0
+        private set
+
+    fun currentPeriod() : PeriodInstanceInterface? {
+        return periodList.getOrNull(currentIdx)
+    }
+
+    fun nextPeriod() : PeriodInstanceInterface? {
+        return periodList.getOrNull(currentIdx + 1)
+    }
+
+    fun done() : Boolean {
+        return state == State.FINISHED
+    }
+
+    fun start(clockTimeMs: Long) {
+        if (state != State.IDLE) {
+            throw IllegalStateException("Invalid transition $state to RUNNING")
+        }
+        state = State.RUNNING
+        startTimeMs = clockTimeMs
+    }
+
+    fun pause(clockTimeMs: Long) {
+        if (state != State.RUNNING) {
+            throw IllegalStateException("Invalid transition $state to PAUSED")
+        }
+        state = State.PAUSED
+        pausedStartTimeMs = clockTimeMs
+    }
+
+    fun resume(clockTimeMs: Long) {
+        if (state != State.PAUSED) {
+            throw IllegalStateException("Invalid transition $state to RUNNING")
+        }
+        state = State.RUNNING
+        pausedDurationMs += (clockTimeMs - (pausedStartTimeMs ?: 0))
+    }
+
+    fun finish() {
+        if (state != State.RUNNING && state != State.PAUSED) {
+            throw IllegalStateException("Invalid transition $state to FINISHED")
+        }
+        state = State.FINISHED
+    }
+
+    // Returns milliseconds until next period ends.
+    fun onTimeUpdate(clockTimeMs: Long) : Long {
+        if (state == State.FINISHED) {
+            return 0
+        }
+        val newElapsedTime = clockTimeMs - startTimeMs - pausedDurationMs
+        return updateElapsedTime(newElapsedTime)
+    }
+
+    private fun updateElapsedTime(newElapsedTime: Long) : Long {
+
+        if (newElapsedTime < totalElapsedMs) {
+            throw IllegalStateException("Time should not go backwards")
+        }
+        totalElapsedMs = newElapsedTime
+
+        while (currentPeriod()?.let { it.endOffsetMs <= newElapsedTime } == true) {
+            currentIdx += 1
+        }
+        currentPeriod()?.let {
+            periodRemainMs = it.endOffsetMs - newElapsedTime
+        } ?: run {
+            periodRemainMs = 0
+        }
+        return periodRemainMs
+    }
+}

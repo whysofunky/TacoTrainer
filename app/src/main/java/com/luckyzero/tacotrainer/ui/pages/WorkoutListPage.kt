@@ -16,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -26,6 +27,7 @@ import com.luckyzero.tacotrainer.ui.utils.UIUtils.formatDuration
 import com.luckyzero.tacotrainer.ui.navigation.WorkoutEdit
 import com.luckyzero.tacotrainer.ui.navigation.WorkoutExecute
 import com.luckyzero.tacotrainer.viewModels.WorkoutListViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 private data class WorkoutListContext(
     val navController: NavHostController,
@@ -33,9 +35,9 @@ private data class WorkoutListContext(
 )
 
 @Composable
-fun WorkoutListPage(navController: NavHostController, modifier: Modifier) {
-    val dbAccess = DbAccess(LocalContext.current)
-    val viewModel = viewModel<WorkoutListViewModel> { WorkoutListViewModel(dbAccess) }
+fun WorkoutListPage(navController: NavHostController,
+    viewModel: WorkoutListViewModel = hiltViewModel(),
+    modifier: Modifier) {
     val listContext = WorkoutListContext(navController, viewModel)
     Column(modifier = modifier) {
         PageHeading()

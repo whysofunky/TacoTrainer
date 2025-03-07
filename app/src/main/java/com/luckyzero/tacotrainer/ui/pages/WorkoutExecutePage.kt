@@ -1,5 +1,6 @@
 package com.luckyzero.tacotrainer.ui.pages
 
+import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,12 +28,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import com.luckyzero.tacotrainer.R
 import com.luckyzero.tacotrainer.database.DbAccess
 import com.luckyzero.tacotrainer.repositories.WorkoutTimer
@@ -41,7 +40,6 @@ import com.luckyzero.tacotrainer.ui.utils.UIUtils
 import com.luckyzero.tacotrainer.ui.utils.visibility
 import com.luckyzero.tacotrainer.viewModels.WorkoutExecuteViewModel
 import java.util.concurrent.TimeUnit
-import kotlin.reflect.jvm.internal.impl.descriptors.Visibilities.Local
 
 private data class ColorTheme(
     val background: Color,
@@ -91,17 +89,13 @@ fun WorkoutExecutePage(args: WorkoutExecute,
                        navHostController: NavHostController,
                        modifier: Modifier
 ) {
-    val context = LocalContext.current
-    //val workManager = WorkManager.getInstance(context)
-    //val workRequest = OneTimeWorkRequestBuilder<TimerWorker>()
-    //    .setInputData(Data.Builder().putLong("id", args.workoutId).build())
-
-
-    // TODO: Put the timer implementation into the Worker, and then get info from it with
-    // an api like this:
-    // workManager.getWorkInfosFlow()
-    val dbAccess = DbAccess(LocalContext.current)
-    val viewModel = viewModel { WorkoutExecuteViewModel(args.workoutId, dbAccess) }
+    val viewModel: WorkoutExecuteViewModel =
+        hiltViewModel<WorkoutExecuteViewModel, WorkoutExecuteViewModel.Factory> { factory ->
+        factory.create(args.workoutId)
+    }
+//    val viewModel: WorkoutExecuteViewModel = viewModel {
+//        WorkoutExecuteViewModel(args.workoutId, dbAccess, application)
+//    }
     LaunchedEffect(EFFECT_INITIAL_LAUNCH) {
         viewModel.start()
     }
@@ -170,7 +164,7 @@ private fun PeriodName(executeContext: WorkoutExecuteContext) {
     val instance by
         executeContext.viewModel.currentPeriodFlow.collectAsStateWithLifecycle(null)
     Text(
-        text = instance?.period?.name ?: "",
+        text = instance?.name ?: "",
         fontSize = 36.sp,
         fontWeight = FontWeight.Bold,
         color = currentTheme.primary,
@@ -182,12 +176,9 @@ private fun PeriodName(executeContext: WorkoutExecuteContext) {
 private fun PeriodState(executeContext: WorkoutExecuteContext) {
     val remainDurationValue by
         executeContext.viewModel.periodRemainTimeMsFlow.collectAsStateWithLifecycle(null)
-    val periodInstanceValue by
-    executeContext.viewModel.currentPeriodFlow.collectAsStateWithLifecycle(null)
+    val period by executeContext.viewModel.currentPeriodFlow.collectAsStateWithLifecycle(null)
 
     val remainDurationMs = remainDurationValue ?: 0L
-    val period = periodInstanceValue?.period
-    val setInstance = periodInstanceValue?.set
     val completeness = period?.duration?.let {
         (remainDurationMs.toFloat() / (TimeUnit.SECONDS.toMillis(it.toLong()).toFloat()))
     } ?: 1f
@@ -201,18 +192,18 @@ private fun PeriodState(executeContext: WorkoutExecuteContext) {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(8.dp),
             )
-            val repStr = setInstance?.let {
+            val repStr = period?.let {
                 stringResource(
                     R.string.set_rep_and_count,
-                    setInstance.rep,
-                    setInstance.set.repeatCount,
+                    it.repetition,
+                    it.setRepeatCount,
                     )
             } ?: ""
             Text(
                 text = repStr,
                 fontSize = 24.sp,
                 color = currentTheme.secondary,
-                modifier = Modifier.visibility(setInstance != null)
+                modifier = Modifier.visibility(period != null)
             )
         }
         CircularProgressIndicator(

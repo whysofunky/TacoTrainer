@@ -176,7 +176,6 @@ class WorkoutTimer(
         // regardless of when it started or how much it was paused.
         val normalizedTime = timeMs - startTimeMs - pausedDurationMs
 
-        Log.d(TAG, "onTimeUpdate $normalizedTime endOffset ${currentPeriod()?.endOffsetMs}")
         _totalElapsedTimeMsFlow.value = normalizedTime
 
         while (currentPeriod()?.let { it.endOffsetMs <= normalizedTime } == true) {

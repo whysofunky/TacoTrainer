@@ -1,20 +1,31 @@
 package com.luckyzero.tacotrainer.viewModels
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.luckyzero.tacotrainer.database.DbAccess
-import com.luckyzero.tacotrainer.models.PeriodInstanceInterface
 import com.luckyzero.tacotrainer.models.SegmentInterface
 import com.luckyzero.tacotrainer.models.WorkoutInterface
 import com.luckyzero.tacotrainer.platform.DefaultClock
 import com.luckyzero.tacotrainer.repositories.WorkoutTimer
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class WorkoutExecuteViewModel(
-    workoutId: Long,
-    dbAccess: DbAccess
-): ViewModel() {
+@HiltViewModel(assistedFactory = WorkoutExecuteViewModel.Factory::class)
+class WorkoutExecuteViewModel @AssistedInject constructor (
+    @Assisted workoutId: Long,
+    dbAccess: DbAccess,
+    application: Application,
+): AndroidViewModel(application) {
+
+    @AssistedFactory
+    interface Factory {
+        fun create(workoutId: Long) : WorkoutExecuteViewModel
+    }
 
     private val clock = DefaultClock
 

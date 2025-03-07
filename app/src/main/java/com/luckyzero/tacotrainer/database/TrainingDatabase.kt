@@ -1,10 +1,12 @@
 package com.luckyzero.tacotrainer.database
 
+import android.app.Application
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room.databaseBuilder
 import androidx.room.RoomDatabase
 import com.luckyzero.tacotrainer.models.SegmentInterface
+import javax.inject.Inject
 import kotlin.concurrent.Volatile
 
 private const val FORCE_CLEAR = false
@@ -35,8 +37,8 @@ abstract class TrainingDatabase : RoomDatabase() {
     }
 }
 
-class DbAccess(context: Context) {
-    val db by lazy { getDatabase(context) }
+class DbAccess @Inject constructor(application: Application) {
+    val db by lazy { getDatabase(application) }
 
     companion object {
         @Volatile
