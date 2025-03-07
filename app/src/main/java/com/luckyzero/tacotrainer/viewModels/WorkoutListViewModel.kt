@@ -7,14 +7,17 @@ import com.luckyzero.tacotrainer.database.DbAccess
 import com.luckyzero.tacotrainer.database.SegmentEntity
 import com.luckyzero.tacotrainer.database.WorkoutEntity
 import com.luckyzero.tacotrainer.models.PersistedWorkoutInterface
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
-class WorkoutListViewModel(dbAccess: DbAccess) : ViewModel() {
+@HiltViewModel
+class WorkoutListViewModel @Inject constructor(dbAccess: DbAccess) : ViewModel() {
 
     companion object {
     }

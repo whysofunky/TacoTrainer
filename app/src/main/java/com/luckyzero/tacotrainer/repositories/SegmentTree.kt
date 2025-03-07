@@ -7,6 +7,7 @@ import com.luckyzero.tacotrainer.models.SegmentInterface
 import com.luckyzero.tacotrainer.models.WorkoutInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
 
 interface SegmentTreeInterface {
@@ -21,7 +22,7 @@ interface SegmentTreeInterface {
     suspend fun deletePeriod(period: SegmentInterface.Period)
 }
 
-class SegmentTreeLoader(dbAccess: DbAccess) {
+class SegmentTreeLoader @Inject constructor (dbAccess: DbAccess) {
     private val workoutDao by lazy { dbAccess.db.workoutDao() }
     private val segmentDao by lazy { dbAccess.db.segmentDao() }
 
@@ -37,17 +38,19 @@ class SegmentTreeLoader(dbAccess: DbAccess) {
     }
 
     suspend fun loadWorkout(workoutId: Long) : SegmentTreeInterface {
-        return workoutDao.lookupWorkout(workoutId)?.let { dbWorkout ->
-            MutableWorkout(
-                dbWorkout.id,
-                dbWorkout.name,
-                dbWorkout.repeatCount
-            ).apply {
-                setChildren(loadWorkoutChildren(this))
-            }.let {
-                SegmentTree(it)
-            }
-        } ?: throw IllegalStateException("No such workout $workoutId")
+        return withContext(Dispatchers.IO) {
+            workoutDao.lookupWorkout(workoutId)?.let { dbWorkout ->
+                MutableWorkout(
+                    dbWorkout.id,
+                    dbWorkout.name,
+                    dbWorkout.repeatCount
+                ).apply {
+                    setChildren(loadWorkoutChildren(this))
+                }.let {
+                    SegmentTree(it)
+                }
+            } ?: throw IllegalStateException("No such workout $workoutId")
+        }
     }
 
     private inner class SegmentTree(

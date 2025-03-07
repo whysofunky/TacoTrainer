@@ -7,16 +7,25 @@ import com.luckyzero.tacotrainer.models.SegmentInterface
 import com.luckyzero.tacotrainer.models.WorkoutInterface
 import com.luckyzero.tacotrainer.repositories.SegmentTreeInterface
 import com.luckyzero.tacotrainer.repositories.SegmentTreeLoader
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class WorkoutEditViewModel(
-    workoutId: Long?,
+@HiltViewModel(assistedFactory = WorkoutEditViewModel.Factory::class)
+class WorkoutEditViewModel @AssistedInject constructor (
+    @Assisted workoutId: Long?,
     private val segmentTreeLoader: SegmentTreeLoader,
 ) : ViewModel() {
+    @AssistedFactory
+    interface Factory {
+        fun create(workoutId: Long?) : WorkoutEditViewModel
+    }
 
     companion object {
         const val ROOT_SET_ID = 0L
