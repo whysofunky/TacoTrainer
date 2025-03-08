@@ -1,5 +1,6 @@
 package com.luckyzero.tacotrainer.ui.pages
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +35,7 @@ import com.luckyzero.tacotrainer.ui.navigation.WorkoutExecute
 import com.luckyzero.tacotrainer.ui.utils.UIUtils
 import com.luckyzero.tacotrainer.ui.utils.visibility
 import com.luckyzero.tacotrainer.viewModels.WorkoutExecuteViewModel
+import kotlinx.coroutines.flow.map
 import java.util.concurrent.TimeUnit
 
 private data class ColorTheme(
@@ -76,8 +78,15 @@ private const val EFFECT_INITIAL_LAUNCH = "InitialLaunch"
 
 private data class WorkoutExecuteContext(
     val navHostController: NavHostController,
-    val viewModel: WorkoutExecuteViewModel
-)
+    val viewModel: WorkoutExecuteViewModel,
+) {
+    val workout get() = viewModel.workoutFlow
+    val state get() = viewModel.stateFlow
+    val totalElapsedTimeMs get() = viewModel.totalElapsedTimeMsFlow
+    val periodRemainTimeMs get() = viewModel.periodRemainTimeMsFlow
+    val currentPeriod get() = viewModel.currentPeriodFlow
+    val nextPeriod get() = viewModel.nextPeriodFlow
+}
 
 @Composable
 fun WorkoutExecutePage(args: WorkoutExecute,
@@ -100,10 +109,8 @@ fun WorkoutExecutePage(args: WorkoutExecute,
 
 @Composable
 private fun WorkoutHeader(executeContext: WorkoutExecuteContext) {
-    val workout by
-        executeContext.viewModel.workoutFlow.collectAsStateWithLifecycle(null)
-    val elapsedMs by
-        executeContext.viewModel.totalElapsedTimeMsFlow.collectAsStateWithLifecycle(null)
+    val workout by executeContext.workout.collectAsStateWithLifecycle(null)
+    val elapsedMs by executeContext.totalElapsedTimeMs.collectAsStateWithLifecycle(null)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(12.dp)
@@ -147,8 +154,7 @@ private fun CurrentPeriodInfo(executeContext: WorkoutExecuteContext) {
 
 @Composable
 private fun PeriodName(executeContext: WorkoutExecuteContext) {
-    val instance by
-        executeContext.viewModel.currentPeriodFlow.collectAsStateWithLifecycle(null)
+    val instance by executeContext.currentPeriod.collectAsStateWithLifecycle(null)
     Text(
         text = instance?.name ?: "",
         fontSize = 36.sp,
@@ -160,10 +166,13 @@ private fun PeriodName(executeContext: WorkoutExecuteContext) {
 
 @Composable
 private fun PeriodState(executeContext: WorkoutExecuteContext) {
-    val remainDurationValue by
-        executeContext.viewModel.periodRemainTimeMsFlow.collectAsStateWithLifecycle(null)
-    val period by executeContext.viewModel.currentPeriodFlow.collectAsStateWithLifecycle(null)
+    val remainDurationValue by executeContext
+        .periodRemainTimeMs.collectAsStateWithLifecycle(null)
+    val period by executeContext.currentPeriod.collectAsStateWithLifecycle(null)
 
+    if (remainDurationValue == 0L) {
+        Log.d(TAG, "WTF")
+    }
     val remainDurationMs = remainDurationValue ?: 0L
     val completeness = period?.duration?.let {
         (remainDurationMs.toFloat() / (TimeUnit.SECONDS.toMillis(it.toLong()).toFloat()))
@@ -181,7 +190,7 @@ private fun PeriodState(executeContext: WorkoutExecuteContext) {
             val repStr = period?.let {
                 stringResource(
                     R.string.set_rep_and_count,
-                    it.repetition,
+                    it.repetition + 1,
                     it.setRepeatCount,
                     )
             } ?: ""
@@ -209,7 +218,8 @@ private fun PeriodNotes(executeContext: WorkoutExecuteContext) {
 
 @Composable
 private fun ButtonBar(executeContext: WorkoutExecuteContext) {
-    val state by executeContext.viewModel.stateFlow.collectAsStateWithLifecycle(WorkoutExecuteViewModel.State.IDLE)
+    val state by executeContext
+        .state.collectAsStateWithLifecycle(WorkoutExecuteViewModel.State.IDLE)
     Row(
         horizontalArrangement = Arrangement.Center,
         modifier = Modifier
@@ -217,7 +227,10 @@ private fun ButtonBar(executeContext: WorkoutExecuteContext) {
             .fillMaxWidth()
     ) {
         when (state) {
-            WorkoutExecuteViewModel.State.IDLE, WorkoutExecuteViewModel.State.LOADING -> {
+            WorkoutExecuteViewModel.State.IDLE -> {
+                // This should be a transient state
+            }
+            WorkoutExecuteViewModel.State.LOADING -> {
                 StartButton(executeContext)
                 Spacer(modifier = Modifier.width(8.dp))
                 EndButton(executeContext)
@@ -254,7 +267,7 @@ private fun StartButton(executeContext: WorkoutExecuteContext) {
     ) {
         Text(
             text = stringResource(R.string.button_start),
-            fontSize=20.sp,
+            fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             )
     }
@@ -294,7 +307,7 @@ private fun ResumeButton(executeContext: WorkoutExecuteContext) {
     ) {
         Text(
             text = stringResource(R.string.button_resume),
-            fontSize=20.sp,
+            fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
         )
     }
@@ -309,7 +322,7 @@ private fun EndButton(executeContext: WorkoutExecuteContext) {
             disabledContentColor = currentTheme.colorless,
         ),
         onClick = {
-            executeContext.viewModel.pause()
+            executeContext.viewModel.stop()
             executeContext.navHostController.popBackStack()
         }
     ) {

@@ -2,6 +2,8 @@ package com.luckyzero.tacotrainer.ui.utils
 
 import android.util.Log
 
+private const val TAG = "UIUtils"
+
 object UIUtils {
     enum class DurationElement {
         NONE,
@@ -33,21 +35,21 @@ object UIUtils {
         // display zero, once you hit zero, the period or workout is over.
         val seconds = (millis/1000).toInt()
         val remainder = millis % 1000
-        val x = if (remainder > 0) {
+        val v = if (remainder > 0) {
             seconds + 1
         } else {
             seconds
         }
-        return x
+        return v
     }
 
     fun millisToElapsedSeconds(millis: Long) : Int {
-        val x = (millis/1000).toInt()
+        val v = (millis/1000).toInt()
         // We want to round down, so that an elapsed time of 12.5 seconds displays as 12.
         // This is because the period or workout will often run *slightly* over the requested
         // time, but a few milliseconds. Often less than a frame length, but if we were to round
         // up, then the workout that was intended to take 12 seconds and ran for 12.001 seconds
         // would display a total elapsed of 13.
-        return x
+        return v
     }
 }

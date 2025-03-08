@@ -91,6 +91,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.hilt.android)
+
     // Square
     ksp(libs.moshi.kotlin.codegen)
     implementation(libs.moshi)

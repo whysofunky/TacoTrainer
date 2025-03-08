@@ -40,24 +40,11 @@ class TimerService : LifecycleService() {
     }
 
     companion object {
-<<<<<<< HEAD
-=======
-        private const val WORKOUT_ID_PARAM = "WorkoutId"
->>>>>>> main
 
         private fun makeIntent(context: Context, action: Action): Intent {
             return Intent(context, TimerService::class.java).also {
                 it.action = action.name
             }
-        }
-
-<<<<<<< HEAD
-        fun start(context: Context) {
-            context.startService(makeIntent(context, Action.START))
-=======
-        fun load(context: Context, workoutId: Long) {
-            context.startService(makeIntent(context, Action.START, workoutId))
->>>>>>> main
         }
 
         fun start(context: Context) {
