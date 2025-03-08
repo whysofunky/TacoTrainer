@@ -31,11 +31,17 @@ List page:
 Workout run page:
  * Animate transitions between periods
 
-Workout timer
- * Make timer a service so that it can run offscreen
+Workout lifecycle 
+ * Allow restart after completing
+ * If page is launched while a timer is in progress, either just keep displaying that, or ask if they want to cancel that workout and start a new one.
  * Confirm dialog before end workout
+ * Persist paused workout state and reload on app restart
+
+Workout timer
  * Post notifications when running
+ * Hold wake lock during timer run
  * Make sound on transitions
+ * Period timer moves after finishing
 
 Settings page
  * Max HR
