@@ -49,7 +49,7 @@ class SegmentTreeLoader @Inject constructor (dbAccess: DbAccess) {
                 }.let {
                     SegmentTree(it)
                 }
-            } ?: throw IllegalStateException("No such workout $workoutId")
+            } ?: error("No such workout $workoutId")
         }
     }
 

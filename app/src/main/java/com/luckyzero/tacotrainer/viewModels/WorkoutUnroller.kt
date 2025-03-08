@@ -46,7 +46,7 @@ object  WorkoutUnroller{
                         startOffsetMs = result.lastOrNull()?.endOffsetMs ?: 0
                     }
                     else ->
-                        throw IllegalStateException("Unexpected child ${child.javaClass.name}")
+                        error("Unexpected child ${child.javaClass.name}")
                 }
             }
         }

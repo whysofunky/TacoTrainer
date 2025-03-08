@@ -4,10 +4,12 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.luckyzero.tacotrainer.database.DbAccess
+import com.luckyzero.tacotrainer.models.PeriodInstanceInterface
 import com.luckyzero.tacotrainer.models.SegmentInterface
 import com.luckyzero.tacotrainer.models.WorkoutInterface
 import com.luckyzero.tacotrainer.platform.DefaultClock
 import com.luckyzero.tacotrainer.repositories.WorkoutTimer
+import com.luckyzero.tacotrainer.service.TimerRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -27,9 +29,7 @@ class WorkoutExecuteViewModel @AssistedInject constructor (
         fun create(workoutId: Long) : WorkoutExecuteViewModel
     }
 
-    private val clock = DefaultClock
-
-    private val timer = WorkoutTimer(workoutId, dbAccess, clock, viewModelScope)
+    private val timer = WorkoutTimer(workoutId, dbAccess, DefaultClock, viewModelScope)
 
     val workoutFlow: Flow<WorkoutInterface?> = timer.workoutFlow.map { workout ->
         workout?.let {

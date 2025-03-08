@@ -119,16 +119,16 @@ class WorkoutEditViewModel @AssistedInject constructor (
         return if (parentSetId == ROOT_SET_ID) {
             segmentTree.workout
         } else {
-            findSet(parentSetId) ?: run { throw IllegalStateException("No such set $parentSetId") }
+            findSet(parentSetId) ?: run { error("No such set $parentSetId") }
         }
     }
 
     private fun findSet(segmentId: Long) : SegmentInterface.Set {
         when (val segment = findSegment(segmentId)) {
             null ->
-                throw IllegalStateException("No such segment $segmentId")
+                error("No such segment $segmentId")
             !is SegmentInterface.Set ->
-                throw IllegalStateException("Segment $segmentId is not a set")
+                error("Segment $segmentId is not a set")
             else ->
                 return segment
         }
@@ -137,9 +137,9 @@ class WorkoutEditViewModel @AssistedInject constructor (
     private fun findPeriod(segmentId: Long) : SegmentInterface.Period {
         when (val segment = findSegment(segmentId)) {
             null ->
-                throw IllegalStateException("No such segment $segmentId")
+                error("No such segment $segmentId")
             !is SegmentInterface.Period ->
-                throw IllegalStateException("Segment $segmentId is not a period")
+                error("Segment $segmentId is not a period")
             else ->
                 return segment
         }

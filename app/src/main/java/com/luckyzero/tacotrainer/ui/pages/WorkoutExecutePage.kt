@@ -39,6 +39,7 @@ import com.luckyzero.tacotrainer.ui.navigation.WorkoutExecute
 import com.luckyzero.tacotrainer.ui.utils.UIUtils
 import com.luckyzero.tacotrainer.ui.utils.visibility
 import com.luckyzero.tacotrainer.viewModels.WorkoutExecuteViewModel
+import com.luckyzero.tacotrainer.viewModels.WorkoutExecuteViewModel2
 import java.util.concurrent.TimeUnit
 
 private data class ColorTheme(
@@ -81,7 +82,7 @@ private const val EFFECT_INITIAL_LAUNCH = "InitialLaunch"
 
 private data class WorkoutExecuteContext(
     val navHostController: NavHostController,
-    val viewModel: WorkoutExecuteViewModel
+    val viewModel: WorkoutExecuteViewModel2
 )
 
 @Composable
@@ -89,15 +90,9 @@ fun WorkoutExecutePage(args: WorkoutExecute,
                        navHostController: NavHostController,
                        modifier: Modifier
 ) {
-    val viewModel: WorkoutExecuteViewModel =
-        hiltViewModel<WorkoutExecuteViewModel, WorkoutExecuteViewModel.Factory> { factory ->
-        factory.create(args.workoutId)
-    }
-//    val viewModel: WorkoutExecuteViewModel = viewModel {
-//        WorkoutExecuteViewModel(args.workoutId, dbAccess, application)
-//    }
+    val viewModel: WorkoutExecuteViewModel2 = hiltViewModel()
     LaunchedEffect(EFFECT_INITIAL_LAUNCH) {
-        viewModel.start()
+        viewModel.loadWorkout(workoutId = args.workoutId)
     }
     val executeContext = WorkoutExecuteContext(navHostController, viewModel)
     Column(modifier = Modifier.fillMaxSize().background(color = currentTheme.background)) {
@@ -113,8 +108,6 @@ fun WorkoutExecutePage(args: WorkoutExecute,
 private fun WorkoutHeader(executeContext: WorkoutExecuteContext) {
     val workout by
         executeContext.viewModel.workoutFlow.collectAsStateWithLifecycle(null)
-    val totalDurationMs by
-        executeContext.viewModel.totalDurationMs.collectAsStateWithLifecycle(null)
     val elapsedMs by
         executeContext.viewModel.totalElapsedTimeMsFlow.collectAsStateWithLifecycle(null)
     Column(
@@ -130,9 +123,8 @@ private fun WorkoutHeader(executeContext: WorkoutExecuteContext) {
             modifier = Modifier.fillMaxWidth().padding(12.dp)
         )
         Row(horizontalArrangement = Arrangement.Center) {
-            val totalDurationStr = UIUtils.formatDuration(UIUtils.millisToElapsedSeconds(
-                totalDurationMs ?: 0L
-            ))
+            val totalDuration = workout?.totalDuration
+            val totalDurationStr = UIUtils.formatDuration(totalDuration ?: 0)
             val elapsedTimeStr = UIUtils.formatDuration(
                 UIUtils.millisToElapsedSeconds(elapsedMs ?: 0L)
             )
@@ -223,7 +215,7 @@ private fun PeriodNotes(executeContext: WorkoutExecuteContext) {
 
 @Composable
 private fun ButtonBar(executeContext: WorkoutExecuteContext) {
-    val state by executeContext.viewModel.stateFlow.collectAsStateWithLifecycle()
+    val state by executeContext.viewModel.stateFlow.collectAsStateWithLifecycle(WorkoutExecuteViewModel2.State.IDLE)
     Row(
         horizontalArrangement = Arrangement.Center,
         modifier = Modifier
@@ -231,22 +223,22 @@ private fun ButtonBar(executeContext: WorkoutExecuteContext) {
             .fillMaxWidth()
     ) {
         when (state) {
-            WorkoutTimer.State.IDLE, WorkoutTimer.State.LOADED_WAITING -> {
+            WorkoutExecuteViewModel2.State.IDLE, WorkoutExecuteViewModel2.State.LOADING -> {
                 StartButton(executeContext)
                 Spacer(modifier = Modifier.width(8.dp))
                 EndButton(executeContext)
             }
-            WorkoutTimer.State.LOADING_READY, WorkoutTimer.State.RUNNING -> {
+            WorkoutExecuteViewModel2.State.READY, WorkoutExecuteViewModel2.State.RUNNING -> {
                 PauseButton(executeContext)
                 Spacer(modifier = Modifier.width(8.dp))
                 EndButton(executeContext)
             }
-            WorkoutTimer.State.PAUSED -> {
+            WorkoutExecuteViewModel2.State.PAUSED -> {
                 ResumeButton(executeContext)
                 Spacer(modifier = Modifier.width(8.dp))
                 EndButton(executeContext)
             }
-            WorkoutTimer.State.FINISHED -> {
+            WorkoutExecuteViewModel2.State.FINISHED -> {
                 FinishedBanner()
             }
         }

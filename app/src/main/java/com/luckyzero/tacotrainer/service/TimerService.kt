@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -19,6 +21,7 @@ import com.luckyzero.tacotrainer.repositories.SegmentTreeLoader
 import com.luckyzero.tacotrainer.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 
 // https://robertohuertas.com/2019/06/29/android_foreground_services/
@@ -28,15 +31,21 @@ private const val ID_RUNNING_TIMER = 1
 @AndroidEntryPoint
 class TimerService : LifecycleService() {
 
+    @Inject
+    lateinit var timerRepository: TimerRepository
+
     enum class Action {
+        LOAD,
         START,
         PAUSE,
         RESUME,
-        STOP
+        STOP,
+        RESTART,
+        CLEAR,
     }
 
     companion object {
-        const val WORKOUT_ID_PARAM = "WorkoutId"
+        private const val WORKOUT_ID_PARAM = "WorkoutId"
 
         private fun makeIntent(context: Context, action: Action, workoutId: Long? = null): Intent {
             return Intent(context, TimerService::class.java).also {
@@ -45,8 +54,12 @@ class TimerService : LifecycleService() {
             }
         }
 
-        fun start(workoutId: Long, context: Context) {
+        fun load(context: Context, workoutId: Long) {
             context.startService(makeIntent(context, Action.START, workoutId))
+        }
+
+        fun start(context: Context) {
+            context.startService(makeIntent(context, Action.START))
         }
 
         fun pause(context: Context) {
@@ -61,23 +74,29 @@ class TimerService : LifecycleService() {
             context.startService(makeIntent(context, Action.STOP))
         }
 
+        fun restart(context: Context) {
+            context.startService(makeIntent(context, Action.RESTART))
+        }
+
+        fun clear(context: Context) {
+            context.startService(makeIntent(context, Action.CLEAR))
+        }
+
     }
 
 
     private var wakeLock: PowerManager.WakeLock? = null
-    private var isServiceStarted = false
-    private var timer: PreloadedTimer? = null
 
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         if (intent != null) {
             when (intent.action) {
-                Action.START.name -> startWorkout(intent.extras)
+                Action.START.name -> startWorkout()
                 Action.PAUSE.name -> pauseWorkout()
                 Action.RESUME.name -> resumeWorkout()
                 Action.STOP.name -> stopWorkout()
-                else -> throw IllegalStateException("Unexpected action ${intent.action}")
+                else -> error("Unexpected action ${intent.action}")
             }
         }
         // by returning this we make sure the service is restarted if the system kills the service.
@@ -87,26 +106,38 @@ class TimerService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         val notification = createNotification()
-        startForeground(ID_RUNNING_TIMER, notification)
+        startForeground(ID_RUNNING_TIMER, notification, FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
     }
 
     override fun onDestroy() {
         super.onDestroy()
     }
 
-    private fun startWorkout(extras: Bundle?) {
-        // TODO: Stop any existing workout timer
-        if (isServiceStarted) return
-        isServiceStarted = true
+    private fun startWorkout() {
+        // Starting service and starting workout are not the same thing
+        timerRepository.serviceStart(lifecycleScope)
     }
 
     private fun pauseWorkout() {
+        timerRepository.servicePause()
+        stopSelf()
     }
 
     private fun resumeWorkout() {
+        timerRepository.serviceResume(lifecycleScope)
     }
 
     private fun stopWorkout() {
+        timerRepository.serviceStop()
+        stopSelf()
+    }
+
+    private fun restartWorkout() {
+        TODO("Need to implement")
+    }
+
+    private fun clearWorkout() {
+        TODO("Need to implement")
     }
 
     private fun createNotification(): Notification {

@@ -79,7 +79,7 @@ class WorkoutTimer(
                     _stateFlow.value = State.RUNNING
                     startTick()
                 }
-                else -> throw IllegalStateException("Invalid transition $state to RUNNING")
+                else -> error("Invalid transition $state to RUNNING")
             }
         }
     }
@@ -93,7 +93,7 @@ class WorkoutTimer(
                 _stateFlow.value = State.RUNNING
                 startTick()
             }
-            else -> throw IllegalStateException("Invalid transition $state to RUNNING")
+            else -> error("Invalid transition $state to RUNNING")
         }
     }
 
@@ -105,7 +105,7 @@ class WorkoutTimer(
                 stopTick()
             }
             State.PAUSED -> { return /* no op */ }
-            else -> throw IllegalStateException("Invalid transition $state to PAUSED")
+            else -> error("Invalid transition $state to PAUSED")
         }
     }
 
@@ -120,7 +120,7 @@ class WorkoutTimer(
                 resumeTick()
             }
             State.RUNNING -> { return /* no op */ }
-            else -> throw IllegalStateException("Invalid transition $state to RUNNING")
+            else -> error("Invalid transition $state to RUNNING")
         }
     }
 
