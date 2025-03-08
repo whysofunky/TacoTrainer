@@ -18,9 +18,6 @@ import com.luckyzero.tacotrainer.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
-
-// https://robertohuertas.com/2019/06/29/android_foreground_services/
-
 private const val ID_RUNNING_TIMER = 1
 
 @AndroidEntryPoint
@@ -31,7 +28,6 @@ class TimerService : LifecycleService() {
     private var wakeLock: PowerManager.WakeLock? = null
 
     enum class Action {
-        LOAD,
         START,
         PAUSE,
         RESUME,
@@ -41,17 +37,11 @@ class TimerService : LifecycleService() {
     }
 
     companion object {
-        private const val WORKOUT_ID_PARAM = "WorkoutId"
 
-        private fun makeIntent(context: Context, action: Action, workoutId: Long? = null): Intent {
+        private fun makeIntent(context: Context, action: Action): Intent {
             return Intent(context, TimerService::class.java).also {
                 it.action = action.name
-                if (workoutId != null) it.putExtra(WORKOUT_ID_PARAM, workoutId)
             }
-        }
-
-        fun load(context: Context, workoutId: Long) {
-            context.startService(makeIntent(context, Action.START, workoutId))
         }
 
         fun start(context: Context) {
@@ -92,7 +82,7 @@ class TimerService : LifecycleService() {
             }
         }
         // by returning this we make sure the service is restarted if the system kills the service.
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onCreate() {
