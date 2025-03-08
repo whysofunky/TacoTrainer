@@ -4,7 +4,7 @@ import com.luckyzero.tacotrainer.models.PeriodInstanceInterface
 
 private const val TAG = "WorkoutTimer"
 
-class PreloadedTimer(
+class WorkoutTimer(
     private val periodList: List<PeriodInstanceInterface>
 ) {
     enum class State {
@@ -16,18 +16,15 @@ class PreloadedTimer(
 
     var state : State = State.IDLE
         private set
-    var startTimeMs : Long = 0
-        private set
-    var pausedStartTimeMs : Long? = null
-        private set
-    var pausedDurationMs : Long = 0
-        private set
-    var currentIdx: Int = 0
-        private set
     var totalElapsedMs: Long = 0
         private set
     var periodRemainMs: Long = 0
         private set
+
+    private var startTimeMs : Long = 0
+    private var pausedStartTimeMs : Long? = null
+    private var pausedDurationMs : Long = 0
+    private var currentIdx: Int = 0
 
     fun currentPeriod() : PeriodInstanceInterface? {
         return periodList.getOrNull(currentIdx)
@@ -43,7 +40,7 @@ class PreloadedTimer(
 
     fun start(clockTimeMs: Long) {
         if (state != State.IDLE) {
-            throw IllegalStateException("Invalid transition $state to RUNNING")
+            error("Invalid transition $state to RUNNING")
         }
         state = State.RUNNING
         startTimeMs = clockTimeMs
@@ -51,7 +48,7 @@ class PreloadedTimer(
 
     fun pause(clockTimeMs: Long) {
         if (state != State.RUNNING) {
-            throw IllegalStateException("Invalid transition $state to PAUSED")
+            error("Invalid transition $state to PAUSED")
         }
         state = State.PAUSED
         pausedStartTimeMs = clockTimeMs
@@ -59,7 +56,7 @@ class PreloadedTimer(
 
     fun resume(clockTimeMs: Long) {
         if (state != State.PAUSED) {
-            throw IllegalStateException("Invalid transition $state to RUNNING")
+            error("Invalid transition $state to RUNNING")
         }
         state = State.RUNNING
         pausedDurationMs += (clockTimeMs - (pausedStartTimeMs ?: 0))
@@ -67,7 +64,7 @@ class PreloadedTimer(
 
     fun finish() {
         if (state != State.RUNNING && state != State.PAUSED) {
-            throw IllegalStateException("Invalid transition $state to FINISHED")
+            error("Invalid transition $state to FINISHED")
         }
         state = State.FINISHED
     }
@@ -84,7 +81,7 @@ class PreloadedTimer(
     private fun updateElapsedTime(newElapsedTime: Long) : Long {
 
         if (newElapsedTime < totalElapsedMs) {
-            throw IllegalStateException("Time should not go backwards")
+            error("Time should not go backwards")
         }
         totalElapsedMs = newElapsedTime
 

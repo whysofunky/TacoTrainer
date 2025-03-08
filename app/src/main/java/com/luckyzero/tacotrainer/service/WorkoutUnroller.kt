@@ -1,4 +1,4 @@
-package com.luckyzero.tacotrainer.viewModels
+package com.luckyzero.tacotrainer.service
 
 import com.luckyzero.tacotrainer.models.PeriodInstanceInterface
 import com.luckyzero.tacotrainer.models.SegmentInterface
@@ -30,7 +30,8 @@ object  WorkoutUnroller{
                     is SegmentInterface.Period -> {
                         val endOffsetMs =
                             startOffsetMs + TimeUnit.SECONDS.toMillis(child.totalDuration.toLong())
-                        result.add(PeriodInstance(
+                        result.add(
+                            PeriodInstance(
                             child.segmentId,
                             child.name,
                             child.totalDuration,
@@ -38,7 +39,8 @@ object  WorkoutUnroller{
                             endOffsetMs,
                             rep,
                             set.repeatCount
-                        ))
+                        )
+                        )
                         startOffsetMs = endOffsetMs
                     }
                     is SegmentInterface.Set -> {
@@ -46,7 +48,7 @@ object  WorkoutUnroller{
                         startOffsetMs = result.lastOrNull()?.endOffsetMs ?: 0
                     }
                     else ->
-                        throw IllegalStateException("Unexpected child ${child.javaClass.name}")
+                        error("Unexpected child ${child.javaClass.name}")
                 }
             }
         }

@@ -10,8 +10,4 @@ import dagger.hilt.android.components.ServiceComponent
 @Module
 @InstallIn(ServiceComponent::class)
 abstract class ServiceModule {
-    @Binds
-    abstract fun bindClock(
-        clock: DefaultClock
-    ) : ClockInterface
 }

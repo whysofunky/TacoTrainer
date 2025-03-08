@@ -6,6 +6,7 @@ import androidx.room.Database
 import androidx.room.Room.databaseBuilder
 import androidx.room.RoomDatabase
 import com.luckyzero.tacotrainer.models.SegmentInterface
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlin.concurrent.Volatile
 
@@ -37,8 +38,8 @@ abstract class TrainingDatabase : RoomDatabase() {
     }
 }
 
-class DbAccess @Inject constructor(application: Application) {
-    val db by lazy { getDatabase(application) }
+class DbAccess @Inject constructor(@ApplicationContext context: Context) {
+    val db by lazy { getDatabase(context) }
 
     companion object {
         @Volatile

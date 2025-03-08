@@ -37,7 +37,7 @@ object SegmentFlattener {
             is SegmentInterface.Period -> {
                 listOf(FlatSegmentModel.Period(segment, depth, parent))
             }
-            else -> { throw IllegalStateException("unexpected segment ${segment.javaClass.name}")}
+            else -> { error("unexpected segment ${segment.javaClass.name}")}
         }
     }
 

@@ -1,6 +1,5 @@
 package com.luckyzero.tacotrainer.ui.pages
 
-import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,11 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.luckyzero.tacotrainer.R
-import com.luckyzero.tacotrainer.database.DbAccess
-import com.luckyzero.tacotrainer.repositories.WorkoutTimer
 import com.luckyzero.tacotrainer.ui.navigation.WorkoutExecute
 import com.luckyzero.tacotrainer.ui.utils.UIUtils
 import com.luckyzero.tacotrainer.ui.utils.visibility
@@ -89,15 +84,9 @@ fun WorkoutExecutePage(args: WorkoutExecute,
                        navHostController: NavHostController,
                        modifier: Modifier
 ) {
-    val viewModel: WorkoutExecuteViewModel =
-        hiltViewModel<WorkoutExecuteViewModel, WorkoutExecuteViewModel.Factory> { factory ->
-        factory.create(args.workoutId)
-    }
-//    val viewModel: WorkoutExecuteViewModel = viewModel {
-//        WorkoutExecuteViewModel(args.workoutId, dbAccess, application)
-//    }
+    val viewModel: WorkoutExecuteViewModel = hiltViewModel()
     LaunchedEffect(EFFECT_INITIAL_LAUNCH) {
-        viewModel.start()
+        viewModel.loadWorkout(workoutId = args.workoutId)
     }
     val executeContext = WorkoutExecuteContext(navHostController, viewModel)
     Column(modifier = Modifier.fillMaxSize().background(color = currentTheme.background)) {
@@ -113,8 +102,6 @@ fun WorkoutExecutePage(args: WorkoutExecute,
 private fun WorkoutHeader(executeContext: WorkoutExecuteContext) {
     val workout by
         executeContext.viewModel.workoutFlow.collectAsStateWithLifecycle(null)
-    val totalDurationMs by
-        executeContext.viewModel.totalDurationMs.collectAsStateWithLifecycle(null)
     val elapsedMs by
         executeContext.viewModel.totalElapsedTimeMsFlow.collectAsStateWithLifecycle(null)
     Column(
@@ -130,9 +117,8 @@ private fun WorkoutHeader(executeContext: WorkoutExecuteContext) {
             modifier = Modifier.fillMaxWidth().padding(12.dp)
         )
         Row(horizontalArrangement = Arrangement.Center) {
-            val totalDurationStr = UIUtils.formatDuration(UIUtils.millisToElapsedSeconds(
-                totalDurationMs ?: 0L
-            ))
+            val totalDuration = workout?.totalDuration
+            val totalDurationStr = UIUtils.formatDuration(totalDuration ?: 0)
             val elapsedTimeStr = UIUtils.formatDuration(
                 UIUtils.millisToElapsedSeconds(elapsedMs ?: 0L)
             )
@@ -223,7 +209,7 @@ private fun PeriodNotes(executeContext: WorkoutExecuteContext) {
 
 @Composable
 private fun ButtonBar(executeContext: WorkoutExecuteContext) {
-    val state by executeContext.viewModel.stateFlow.collectAsStateWithLifecycle()
+    val state by executeContext.viewModel.stateFlow.collectAsStateWithLifecycle(WorkoutExecuteViewModel.State.IDLE)
     Row(
         horizontalArrangement = Arrangement.Center,
         modifier = Modifier
@@ -231,22 +217,22 @@ private fun ButtonBar(executeContext: WorkoutExecuteContext) {
             .fillMaxWidth()
     ) {
         when (state) {
-            WorkoutTimer.State.IDLE, WorkoutTimer.State.LOADED_WAITING -> {
+            WorkoutExecuteViewModel.State.IDLE, WorkoutExecuteViewModel.State.LOADING -> {
                 StartButton(executeContext)
                 Spacer(modifier = Modifier.width(8.dp))
                 EndButton(executeContext)
             }
-            WorkoutTimer.State.LOADING_READY, WorkoutTimer.State.RUNNING -> {
+            WorkoutExecuteViewModel.State.READY, WorkoutExecuteViewModel.State.RUNNING -> {
                 PauseButton(executeContext)
                 Spacer(modifier = Modifier.width(8.dp))
                 EndButton(executeContext)
             }
-            WorkoutTimer.State.PAUSED -> {
+            WorkoutExecuteViewModel.State.PAUSED -> {
                 ResumeButton(executeContext)
                 Spacer(modifier = Modifier.width(8.dp))
                 EndButton(executeContext)
             }
-            WorkoutTimer.State.FINISHED -> {
+            WorkoutExecuteViewModel.State.FINISHED -> {
                 FinishedBanner()
             }
         }
