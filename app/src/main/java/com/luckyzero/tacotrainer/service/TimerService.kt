@@ -6,21 +6,16 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
 import android.graphics.Color
 import android.os.Build
-import android.os.Bundle
 import android.os.PowerManager
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.luckyzero.tacotrainer.R
-import com.luckyzero.tacotrainer.database.DbAccess
-import com.luckyzero.tacotrainer.platform.DefaultClock
-import com.luckyzero.tacotrainer.repositories.SegmentTreeLoader
 import com.luckyzero.tacotrainer.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 
@@ -32,7 +27,8 @@ private const val ID_RUNNING_TIMER = 1
 class TimerService : LifecycleService() {
 
     @Inject
-    lateinit var timerRepository: TimerRepository
+    lateinit var timerRunner: TimerRunner
+    private var wakeLock: PowerManager.WakeLock? = null
 
     enum class Action {
         LOAD,
@@ -84,10 +80,6 @@ class TimerService : LifecycleService() {
 
     }
 
-
-    private var wakeLock: PowerManager.WakeLock? = null
-
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         if (intent != null) {
@@ -106,7 +98,13 @@ class TimerService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         val notification = createNotification()
-        startForeground(ID_RUNNING_TIMER, notification, FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(ID_RUNNING_TIMER, notification, FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(ID_RUNNING_TIMER, notification, FOREGROUND_SERVICE_TYPE_NONE)
+        } else {
+            startForeground(ID_RUNNING_TIMER, notification)
+        }
     }
 
     override fun onDestroy() {
@@ -115,20 +113,20 @@ class TimerService : LifecycleService() {
 
     private fun startWorkout() {
         // Starting service and starting workout are not the same thing
-        timerRepository.serviceStart(lifecycleScope)
+        timerRunner.serviceStart(lifecycleScope)
     }
 
     private fun pauseWorkout() {
-        timerRepository.servicePause()
+        timerRunner.servicePause()
         stopSelf()
     }
 
     private fun resumeWorkout() {
-        timerRepository.serviceResume(lifecycleScope)
+        timerRunner.serviceResume(lifecycleScope)
     }
 
     private fun stopWorkout() {
-        timerRepository.serviceStop()
+        timerRunner.serviceStop()
         stopSelf()
     }
 

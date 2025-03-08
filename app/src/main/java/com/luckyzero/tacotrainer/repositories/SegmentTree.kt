@@ -4,7 +4,6 @@ import com.luckyzero.tacotrainer.database.DbAccess
 import com.luckyzero.tacotrainer.database.SegmentEntity
 import com.luckyzero.tacotrainer.database.WorkoutEntity
 import com.luckyzero.tacotrainer.models.SegmentInterface
-import com.luckyzero.tacotrainer.models.WorkoutInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject

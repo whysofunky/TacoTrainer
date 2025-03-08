@@ -4,7 +4,7 @@ import com.luckyzero.tacotrainer.models.PeriodInstanceInterface
 
 private const val TAG = "WorkoutTimer"
 
-class PreloadedTimer(
+class WorkoutTimer(
     private val periodList: List<PeriodInstanceInterface>
 ) {
     enum class State {

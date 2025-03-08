@@ -1,6 +1,5 @@
 package com.luckyzero.tacotrainer.ui.pages
 
-import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,16 +28,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.luckyzero.tacotrainer.R
-import com.luckyzero.tacotrainer.database.DbAccess
-import com.luckyzero.tacotrainer.repositories.WorkoutTimer
 import com.luckyzero.tacotrainer.ui.navigation.WorkoutExecute
 import com.luckyzero.tacotrainer.ui.utils.UIUtils
 import com.luckyzero.tacotrainer.ui.utils.visibility
 import com.luckyzero.tacotrainer.viewModels.WorkoutExecuteViewModel
-import com.luckyzero.tacotrainer.viewModels.WorkoutExecuteViewModel2
 import java.util.concurrent.TimeUnit
 
 private data class ColorTheme(
@@ -82,7 +76,7 @@ private const val EFFECT_INITIAL_LAUNCH = "InitialLaunch"
 
 private data class WorkoutExecuteContext(
     val navHostController: NavHostController,
-    val viewModel: WorkoutExecuteViewModel2
+    val viewModel: WorkoutExecuteViewModel
 )
 
 @Composable
@@ -90,7 +84,7 @@ fun WorkoutExecutePage(args: WorkoutExecute,
                        navHostController: NavHostController,
                        modifier: Modifier
 ) {
-    val viewModel: WorkoutExecuteViewModel2 = hiltViewModel()
+    val viewModel: WorkoutExecuteViewModel = hiltViewModel()
     LaunchedEffect(EFFECT_INITIAL_LAUNCH) {
         viewModel.loadWorkout(workoutId = args.workoutId)
     }
@@ -215,7 +209,7 @@ private fun PeriodNotes(executeContext: WorkoutExecuteContext) {
 
 @Composable
 private fun ButtonBar(executeContext: WorkoutExecuteContext) {
-    val state by executeContext.viewModel.stateFlow.collectAsStateWithLifecycle(WorkoutExecuteViewModel2.State.IDLE)
+    val state by executeContext.viewModel.stateFlow.collectAsStateWithLifecycle(WorkoutExecuteViewModel.State.IDLE)
     Row(
         horizontalArrangement = Arrangement.Center,
         modifier = Modifier
@@ -223,22 +217,22 @@ private fun ButtonBar(executeContext: WorkoutExecuteContext) {
             .fillMaxWidth()
     ) {
         when (state) {
-            WorkoutExecuteViewModel2.State.IDLE, WorkoutExecuteViewModel2.State.LOADING -> {
+            WorkoutExecuteViewModel.State.IDLE, WorkoutExecuteViewModel.State.LOADING -> {
                 StartButton(executeContext)
                 Spacer(modifier = Modifier.width(8.dp))
                 EndButton(executeContext)
             }
-            WorkoutExecuteViewModel2.State.READY, WorkoutExecuteViewModel2.State.RUNNING -> {
+            WorkoutExecuteViewModel.State.READY, WorkoutExecuteViewModel.State.RUNNING -> {
                 PauseButton(executeContext)
                 Spacer(modifier = Modifier.width(8.dp))
                 EndButton(executeContext)
             }
-            WorkoutExecuteViewModel2.State.PAUSED -> {
+            WorkoutExecuteViewModel.State.PAUSED -> {
                 ResumeButton(executeContext)
                 Spacer(modifier = Modifier.width(8.dp))
                 EndButton(executeContext)
             }
-            WorkoutExecuteViewModel2.State.FINISHED -> {
+            WorkoutExecuteViewModel.State.FINISHED -> {
                 FinishedBanner()
             }
         }

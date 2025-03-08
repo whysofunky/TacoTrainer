@@ -3,13 +3,11 @@ package com.luckyzero.tacotrainer.service
 import android.app.Application
 import android.util.Log
 import com.luckyzero.tacotrainer.database.DbAccess
-import com.luckyzero.tacotrainer.models.PeriodInstanceInterface
 import com.luckyzero.tacotrainer.models.SegmentInterface
 import com.luckyzero.tacotrainer.platform.ClockInterface
 import com.luckyzero.tacotrainer.platform.assertMainThread
 import com.luckyzero.tacotrainer.repositories.SegmentTreeLoader
-import com.luckyzero.tacotrainer.viewModels.WorkoutUnroller
-import dagger.hilt.android.qualifiers.ApplicationContext
+import com.luckyzero.tacotrainer.repositories.TimerRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -19,108 +17,73 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val TAG = "TimerRepository"
+private const val TAG = "TimerRunner"
 
 @Singleton
-class TimerRepository @Inject constructor(
+class TimerRunner @Inject constructor(
     private val dbAccess: DbAccess,
     private val clock: ClockInterface,
     private val application: Application,
-) {
-   companion object {
+) : TimerRepository {
+    companion object {
         private const val MAX_TICK_MS = 24L
     }
 
+    init {
+        Log.d(TAG, "TimerRunner")
+    }
+
     private val _workoutFlow = MutableStateFlow<SegmentInterface.Workout?>(null)
-    private val _timerStateFlow = MutableStateFlow<TimerState?>(null)
-    private var timer: PreloadedTimer? = null
+    private val _timerStateFlow = MutableStateFlow<TimerRepository.TimerState?>(null)
+    private var timer: WorkoutTimer? = null
     private var tickJob: Job? = null
     private var autoStart: Boolean = true
 
-    val workoutFlow: StateFlow<SegmentInterface.Workout?> = _workoutFlow
-    val timerStateFlow: StateFlow<TimerState?> = _timerStateFlow
+    override val workoutFlow: StateFlow<SegmentInterface.Workout?> = _workoutFlow
+    override val timerStateFlow: StateFlow<TimerRepository.TimerState?> = _timerStateFlow
 
-
-    enum class TimerRunState {
-        READY,
-        RUNNING,
-        PAUSED,
-        FINISHED
-    }
-
-    data class TimerState(
-        val runState: TimerRunState,
-        val totalElapsedMs: Long,
-        val periodRemainMs: Long,
-        val currentPeriod: PeriodInstanceInterface?,
-        val nextPeriod: PeriodInstanceInterface?,
-    )
-
-    suspend fun loadTimer(workoutId: Long) {
+    override suspend fun loadTimer(workoutId: Long) {
         assertMainThread()
         val treeLoader = SegmentTreeLoader(dbAccess)
         val tree = treeLoader.loadWorkout(workoutId)
         _workoutFlow.value = tree.workout
         val periodList = WorkoutUnroller.unroll(tree)
-        timer = PreloadedTimer(periodList)
+        timer = WorkoutTimer(periodList)
         if (autoStart) {
             TimerService.start(application)
         }
     }
 
-    fun clearTimer() {
+    override fun clearTimer() {
         assertMainThread()
         timer = null
         _workoutFlow.value = null
     }
 
-    fun start() {
+    override fun start() {
         autoStart = true
         TimerService.start(application)
     }
 
-    fun pause() {
+    override fun pause() {
         autoStart = false
         TimerService.pause(application)
     }
 
-    fun resume() {
+    override fun resume() {
         autoStart = true
         TimerService.resume(application)
     }
 
-    fun stop() {
+    override fun stop() {
         autoStart = false
         TimerService.stop(application)
-    }
-
-    // TODO: this this accessible only to the service.
-    // This could be done by making the repository implement an interface that has less capability.
-
-    private fun publishTimerState(timer: PreloadedTimer?) {
-        timer ?: run {
-            _timerStateFlow.value = null
-            return
-        }
-        val runState = when (timer.state) {
-            PreloadedTimer.State.IDLE -> TimerRunState.READY
-            PreloadedTimer.State.RUNNING -> TimerRunState.RUNNING
-            PreloadedTimer.State.PAUSED -> TimerRunState.PAUSED
-            PreloadedTimer.State.FINISHED -> TimerRunState.FINISHED
-        }
-        val timerState = TimerState(
-            runState,
-            timer.totalElapsedMs,
-            timer.periodRemainMs,
-            timer.currentPeriod(),
-            timer.nextPeriod(),
-        )
-        _timerStateFlow.value = timerState
     }
 
     fun serviceStart(scope: CoroutineScope) {
         timer?.let {
             it.start(clock.elapsedRealtime())
+            publishTimerState(it)
             startTickJob(it, scope)
         } ?: run {
             error("Timer uninitialized")
@@ -130,6 +93,7 @@ class TimerRepository @Inject constructor(
     fun servicePause() {
         timer?.let {
             it.pause(clock.elapsedRealtime())
+            publishTimerState(it)
             stopTickJob()
         } ?: run {
             error("Timer uninitialized")
@@ -139,6 +103,7 @@ class TimerRepository @Inject constructor(
     fun serviceResume(scope: CoroutineScope) {
         timer?.let {
             it.resume(clock.elapsedRealtime())
+            publishTimerState(it)
             startTickJob(it, scope)
         } ?: run {
             error("Timer uninitialized")
@@ -148,6 +113,7 @@ class TimerRepository @Inject constructor(
     fun serviceStop() {
         timer?.let {
             it.finish()
+            publishTimerState(it)
             stopTickJob()
         } ?: run {
             error("Timer uninitialized")
@@ -155,7 +121,28 @@ class TimerRepository @Inject constructor(
         onFinished()
     }
 
-    private fun startTickJob(timer: PreloadedTimer, scope: CoroutineScope) {
+    private fun publishTimerState(timer: WorkoutTimer?) {
+        timer ?: run {
+            _timerStateFlow.value = null
+            return
+        }
+        val runState = when (timer.state) {
+            WorkoutTimer.State.IDLE -> TimerRepository.TimerRunState.READY
+            WorkoutTimer.State.RUNNING -> TimerRepository.TimerRunState.RUNNING
+            WorkoutTimer.State.PAUSED -> TimerRepository.TimerRunState.PAUSED
+            WorkoutTimer.State.FINISHED -> TimerRepository.TimerRunState.FINISHED
+        }
+        val timerState = TimerRepository.TimerState(
+            runState,
+            timer.totalElapsedMs,
+            timer.periodRemainMs,
+            timer.currentPeriod(),
+            timer.nextPeriod(),
+        )
+        _timerStateFlow.value = timerState
+    }
+
+    private fun startTickJob(timer: WorkoutTimer, scope: CoroutineScope) {
         if (tickJob == null) {
             tickJob = scope.launch {
                 runTicks(timer)
@@ -168,7 +155,7 @@ class TimerRepository @Inject constructor(
         tickJob = null
     }
 
-    private suspend fun runTicks(timer: PreloadedTimer) {
+    private suspend fun runTicks(timer: WorkoutTimer) {
         while (!timer.done()) {
             val msUntilNextPeriod = timer.onTimeUpdate(clock.elapsedRealtime())
             publishTimerState(timer)
