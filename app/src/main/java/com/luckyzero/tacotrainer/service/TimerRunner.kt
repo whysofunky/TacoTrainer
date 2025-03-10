@@ -8,12 +8,9 @@ import com.luckyzero.tacotrainer.platform.ClockInterface
 import com.luckyzero.tacotrainer.platform.assertMainThread
 import com.luckyzero.tacotrainer.repositories.SegmentTreeLoader
 import com.luckyzero.tacotrainer.repositories.TimerRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,144 +23,178 @@ class TimerRunner @Inject constructor(
     private val application: Application,
 ) : TimerRepository {
     companion object {
-        private const val MAX_TICK_MS = 24L
+        private const val MAX_TICK_MS = 11L
+
+        private fun makeTimerState(
+            loading: Boolean,
+            timer: WorkoutTimer?
+        ): TimerRepository.TimerState {
+            val workoutState = when (timer?.state) {
+                null -> if (loading)
+                    TimerRepository.WorkoutState.LOADING
+                else
+                    TimerRepository.WorkoutState.NO_WORKOUT
+                WorkoutTimer.State.IDLE -> TimerRepository.WorkoutState.READY
+                WorkoutTimer.State.RUNNING -> TimerRepository.WorkoutState.RUNNING
+                WorkoutTimer.State.PAUSED -> TimerRepository.WorkoutState.PAUSED
+                WorkoutTimer.State.FINISHED -> TimerRepository.WorkoutState.FINISHED
+            }
+            return TimerRepository.TimerState(
+                workoutState,
+                timer?.timerId,
+                timer?.totalElapsedMs,
+                timer?.periodRemainMs,
+                timer?.currentPeriod(),
+                timer?.nextPeriod(),
+            )
+        }
     }
 
-    private var timer: WorkoutTimer? = null
-    private var tickJob: Job? = null
-    private var autoStart: Boolean = true
-    private var runState: TimerRepository.TimerRunState = TimerRepository.TimerRunState.IDLE
+    private var latestId: Int = 0;
+    private var storedTimer: WorkoutTimer? = null
+    private var loading: Boolean = false
 
     private val _workoutFlow = MutableStateFlow<SegmentInterface.Workout?>(null)
-    private val _timerStateFlow = MutableStateFlow(makeTimerState(runState, timer))
+    private val _timerStateFlow = MutableStateFlow(makeTimerState(loading, storedTimer))
 
     override val workoutFlow: StateFlow<SegmentInterface.Workout?> = _workoutFlow
     override val timerStateFlow: StateFlow<TimerRepository.TimerState> = _timerStateFlow
 
+    init {
+        Log.d(TAG, "New TimerRunner")
+    }
+
     override suspend fun loadTimer(workoutId: Long) {
         assertMainThread()
-        val treeLoader = SegmentTreeLoader(dbAccess)
-        val tree = treeLoader.loadWorkout(workoutId)
-        _workoutFlow.value = tree.workout
-        val periodList = WorkoutUnroller.unroll(tree)
-        timer = WorkoutTimer(periodList)
-        runState = TimerRepository.TimerRunState.READY
-        publishTimerState(timer)
-        if (autoStart) {
-            TimerService.start(application)
+        clear()
+        setLoading(true)
+        val newTimer = try {
+            load(workoutId)
+        } finally {
+            setLoading(false)
         }
+        publishTimerState()
     }
 
     override fun clearTimer() {
         assertMainThread()
-        timer = null
-        _workoutFlow.value = null
+        clear()
+        publishTimerState()
     }
 
     override fun start() {
-        autoStart = true
-        TimerService.start(application)
+        storedTimer?.let {
+            TimerService.start(it.timerId, application)
+        }
     }
 
     override fun pause() {
-        autoStart = false
-        TimerService.pause(application)
+        storedTimer?.let {
+            TimerService.pause(it.timerId, application)
+        }
     }
 
     override fun resume() {
-        autoStart = true
-        TimerService.resume(application)
+        storedTimer?.let {
+            TimerService.resume(it.timerId, application)
+        }
     }
 
     override fun stop() {
-        autoStart = false
-        TimerService.stop(application)
-    }
-
-    fun serviceStart(scope: CoroutineScope) {
-        timer?.let {
-            it.start(clock.elapsedRealtime())
-            runState = TimerRepository.TimerRunState.RUNNING
-            publishTimerState(it)
-            startTickJob(it, scope)
-        } ?: run {
-            error("Timer uninitialized")
+        storedTimer?.let {
+            TimerService.stop(it.timerId, application)
         }
     }
 
-    fun servicePause() {
-        timer?.let {
-            it.pause(clock.elapsedRealtime())
-            runState = TimerRepository.TimerRunState.PAUSED
-            publishTimerState(it)
-            stopTickJob()
-        } ?: run {
-            error("Timer uninitialized")
+    override fun restart() {
+        storedTimer?.let {
+            TimerService.restart(it.timerId, application)
         }
     }
 
-    fun serviceResume(scope: CoroutineScope) {
-        timer?.let {
-            it.resume(clock.elapsedRealtime())
-            runState = TimerRepository.TimerRunState.RUNNING
-            publishTimerState(it)
-            startTickJob(it, scope)
-        } ?: run {
-            error("Timer uninitialized")
+    fun serviceStart(timerId: Int) {
+        val t = storedTimer
+        if (t?.timerId == timerId) {
+            t.start(clock.elapsedRealtime())
+        } else{
+            Log.i(TAG, "TimerId mismatch operation: start current ${t?.timerId} new $timerId")
         }
     }
 
-    fun serviceStop() {
-        timer?.finish() ?: run {
-            error("Timer uninitialized")
+    fun servicePause(timerId: Int) {
+        val t = storedTimer
+        if (t?.timerId == timerId) {
+            t.pause(clock.elapsedRealtime())
+            publishTimerState()
+        } else{
+            Log.i(TAG, "TimerId mismatch operation: pause current ${t?.timerId} new $timerId")
         }
-        onFinished()
     }
 
-    private fun publishTimerState(timer: WorkoutTimer?) {
-        _timerStateFlow.value = makeTimerState(runState, timer)
+    fun serviceResume(timerId: Int) {
+        val t = storedTimer
+        if (t?.timerId == timerId) {
+            t.resume(clock.elapsedRealtime())
+        } else{
+            Log.i(TAG, "TimerId mismatch operation: resume current ${t?.timerId} new $timerId")
+        }
     }
 
-    private fun makeTimerState(
-        runState: TimerRepository.TimerRunState,
-        timer: WorkoutTimer?
-    ): TimerRepository.TimerState {
-        return TimerRepository.TimerState(
-            runState,
-            timer?.totalElapsedMs,
-            timer?.periodRemainMs,
-            timer?.currentPeriod(),
-            timer?.nextPeriod(),
-        )
+    fun serviceStop(timerId: Int) {
+        val t = storedTimer
+        if (t?.timerId == timerId) {
+            t.stop()
+            publishTimerState()
+        } else{
+            Log.i(TAG, "TimerId mismatch operation: stop current ${t?.timerId} new $timerId")
+        }
     }
 
-    private fun startTickJob(timer: WorkoutTimer, scope: CoroutineScope) {
-        if (tickJob == null) {
-            tickJob = scope.launch {
-                runTicks(timer)
-                onFinished()
+    fun serviceRestart(timerId: Int) {
+        val t = storedTimer
+        if (t?.timerId == timerId) {
+            t.restart(clock.elapsedRealtime())
+        } else{
+            Log.i(TAG, "TimerId mismatch operation: restart current ${t?.timerId} new $timerId")
+        }
+    }
+
+    suspend fun runTicks(timerId: Int) {
+        // This should stop when paused, explicitly finished, or just runs out of periods.
+        storedTimer?.let { tickingTimer ->
+            while (tickingTimer.active() && timerId == storedTimer?.timerId) {
+                val msUntilNextPeriod = tickingTimer.onTimeUpdate(clock.elapsedRealtime())
+                publishTimerState()
+                delay(msUntilNextPeriod.coerceAtMost(MAX_TICK_MS))
             }
+            publishTimerState()
         }
     }
 
-    private fun stopTickJob() {
-        tickJob?.cancel()
-        tickJob = null
+    private suspend fun load(workoutId: Long) : WorkoutTimer {
+        check(storedTimer == null)
+        val treeLoader = SegmentTreeLoader(dbAccess)
+        val tree = treeLoader.loadWorkout(workoutId)
+        _workoutFlow.value = tree.workout
+        val periodList = WorkoutUnroller.unroll(tree)
+        latestId += 1
+        val newTimer = WorkoutTimer(latestId, periodList)
+        storedTimer = newTimer
+        return newTimer
     }
 
-    private suspend fun runTicks(timer: WorkoutTimer) {
-        while (!timer.finished()) {
-            val msUntilNextPeriod = timer.onTimeUpdate(clock.elapsedRealtime())
-            publishTimerState(timer)
-            val delayMs = msUntilNextPeriod.coerceAtMost(MAX_TICK_MS)
-            delay(delayMs)
-        }
+    private fun clear() {
+        storedTimer?.ensureStopped()
+        storedTimer = null
+        _workoutFlow.value = null
     }
 
-    private fun onFinished() {
-        timer = null
-        stopTickJob()
-        runState = TimerRepository.TimerRunState.IDLE
-        publishTimerState(timer)
+    private fun setLoading(newValue: Boolean) {
+        loading = newValue
+        publishTimerState()
+    }
+
+    private fun publishTimerState() {
+        _timerStateFlow.value = makeTimerState(loading, storedTimer)
     }
 }

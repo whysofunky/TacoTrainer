@@ -15,13 +15,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -31,11 +35,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.luckyzero.tacotrainer.R
+import com.luckyzero.tacotrainer.models.WorkoutInterface
 import com.luckyzero.tacotrainer.ui.navigation.WorkoutExecute
 import com.luckyzero.tacotrainer.ui.utils.UIUtils
 import com.luckyzero.tacotrainer.ui.utils.visibility
 import com.luckyzero.tacotrainer.viewModels.WorkoutExecuteViewModel
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 private data class ColorTheme(
@@ -88,16 +98,29 @@ private data class WorkoutExecuteContext(
     val nextPeriod get() = viewModel.nextPeriodFlow
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutExecutePage(args: WorkoutExecute,
                        navHostController: NavHostController,
                        modifier: Modifier
 ) {
     val viewModel: WorkoutExecuteViewModel = hiltViewModel()
-    LaunchedEffect(EFFECT_INITIAL_LAUNCH) {
-        viewModel.loadWorkout(workoutId = args.workoutId)
-    }
     val executeContext = WorkoutExecuteContext(navHostController, viewModel)
+    var autoStart = remember { true }
+    val coroutineScope = rememberCoroutineScope()
+    LaunchedEffect(EFFECT_INITIAL_LAUNCH) {
+        if (viewModel.workoutFlow.value?.id != args.workoutId) {
+            viewModel.loadWorkout(workoutId = args.workoutId)
+        }
+        coroutineScope.launch {
+            viewModel.stateFlow.filterNotNull().takeWhile { autoStart }.collect {
+                if (it == WorkoutExecuteViewModel.State.READY) {
+                    viewModel.start()
+                    autoStart = false
+                }
+            }
+        }
+    }
     Column(modifier = Modifier.fillMaxSize().background(color = currentTheme.background)) {
         WorkoutHeader(executeContext)
         Spacer(modifier = Modifier.weight(1f))
@@ -169,10 +192,6 @@ private fun PeriodState(executeContext: WorkoutExecuteContext) {
     val remainDurationValue by executeContext
         .periodRemainTimeMs.collectAsStateWithLifecycle(null)
     val period by executeContext.currentPeriod.collectAsStateWithLifecycle(null)
-
-    if (remainDurationValue == 0L) {
-        Log.d(TAG, "WTF")
-    }
     val remainDurationMs = remainDurationValue ?: 0L
     val completeness = period?.duration?.let {
         (remainDurationMs.toFloat() / (TimeUnit.SECONDS.toMillis(it.toLong()).toFloat()))
@@ -213,45 +232,117 @@ private fun PeriodState(executeContext: WorkoutExecuteContext) {
 
 @Composable
 private fun PeriodNotes(executeContext: WorkoutExecuteContext) {
-
+    Spacer(modifier = Modifier.height(24.dp))
+    Row {
+        Text(
+            text = "Target HR",
+            textAlign = TextAlign.End,
+            fontSize = 24.sp,
+            color = currentTheme.secondary,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = "120 - 130",
+            textAlign = TextAlign.Start,
+            fontSize = 24.sp,
+            color = currentTheme.secondary,
+            modifier = Modifier.weight(1f),
+        )
+    }
+    Row {
+        Text(
+            text = "Target Pace",
+            textAlign = TextAlign.End,
+            fontSize = 24.sp,
+            color = currentTheme.secondary,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = "8:00",
+            textAlign = TextAlign.Start,
+            fontSize = 24.sp,
+            color = currentTheme.secondary,
+            modifier = Modifier.weight(1f),
+        )
+    }
 }
 
 @Composable
 private fun ButtonBar(executeContext: WorkoutExecuteContext) {
     val state by executeContext
         .state.collectAsStateWithLifecycle(WorkoutExecuteViewModel.State.IDLE)
-    Row(
-        horizontalArrangement = Arrangement.Center,
-        modifier = Modifier
-            .height(76.dp)
-            .fillMaxWidth()
-    ) {
-        when (state) {
-            WorkoutExecuteViewModel.State.IDLE -> {
-                // This should be a transient state
-            }
-            WorkoutExecuteViewModel.State.LOADING -> {
-                StartButton(executeContext)
-                Spacer(modifier = Modifier.width(8.dp))
-                EndButton(executeContext)
-            }
-            WorkoutExecuteViewModel.State.READY, WorkoutExecuteViewModel.State.RUNNING -> {
-                PauseButton(executeContext)
-                Spacer(modifier = Modifier.width(8.dp))
-                EndButton(executeContext)
-            }
-            WorkoutExecuteViewModel.State.PAUSED -> {
-                ResumeButton(executeContext)
-                Spacer(modifier = Modifier.width(8.dp))
-                EndButton(executeContext)
-            }
-            WorkoutExecuteViewModel.State.FINISHED -> {
-                FinishedBanner()
-            }
+    Log.d(TAG, "display state $state")
+    when (state) {
+        WorkoutExecuteViewModel.State.IDLE -> {
+            // This should be a transient state
+        }
+        WorkoutExecuteViewModel.State.LOADING, WorkoutExecuteViewModel.State.READY -> {
+            ReadyButtonBar(executeContext)
+        }
+        WorkoutExecuteViewModel.State.RUNNING -> {
+            RunningButtonBar(executeContext)
+        }
+        WorkoutExecuteViewModel.State.PAUSED -> {
+            PausedButtonBar(executeContext)
+        }
+        WorkoutExecuteViewModel.State.FINISHED -> {
+            FinishedButtonBar(executeContext)
         }
     }
 }
 
+@Composable
+private fun ReadyButtonBar(executeContext: WorkoutExecuteContext) {
+    Row(
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.height(96.dp).fillMaxWidth()
+    ) {
+        StartButton(executeContext)
+        Spacer(modifier = Modifier.width(8.dp))
+        EndButton(executeContext)
+    }
+}
+
+@Composable
+private fun RunningButtonBar(executeContext: WorkoutExecuteContext) {
+    Row(
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.height(96.dp).fillMaxWidth()
+    ) {
+        PauseButton(executeContext)
+        Spacer(modifier = Modifier.width(8.dp))
+        EndButton(executeContext)
+    }
+}
+
+@Composable
+private fun PausedButtonBar(executeContext: WorkoutExecuteContext) {
+    Row(
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.height(96.dp).fillMaxWidth()
+    ) {
+        ResumeButton(executeContext)
+        Spacer(modifier = Modifier.width(8.dp))
+        EndButton(executeContext)
+    }
+}
+
+@Composable
+private fun FinishedButtonBar(executeContext: WorkoutExecuteContext) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.height(96.dp).fillMaxWidth()
+    ) {
+        RestartButton(executeContext)
+        FinishedBanner()
+    }
+}
 
 @Composable
 private fun StartButton(executeContext: WorkoutExecuteContext) {
@@ -314,6 +405,26 @@ private fun ResumeButton(executeContext: WorkoutExecuteContext) {
 }
 
 @Composable
+private fun RestartButton(executeContext: WorkoutExecuteContext) {
+    Button(
+        colors = ButtonColors(containerColor = currentTheme.colorless,
+            contentColor = currentTheme.contrast,
+            disabledContainerColor = currentTheme.colorlessInverse,
+            disabledContentColor = currentTheme.colorless,
+        ),
+        onClick = {
+            executeContext.viewModel.restart()
+        }
+    ) {
+        Text(
+            text = stringResource(R.string.button_restart),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
 private fun EndButton(executeContext: WorkoutExecuteContext) {
     Button(
         colors = ButtonColors(containerColor = currentTheme.colorless,
@@ -323,7 +434,6 @@ private fun EndButton(executeContext: WorkoutExecuteContext) {
         ),
         onClick = {
             executeContext.viewModel.stop()
-            executeContext.navHostController.popBackStack()
         }
     ) {
         Text(
