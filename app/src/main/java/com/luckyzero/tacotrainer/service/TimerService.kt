@@ -11,15 +11,19 @@ import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
 import android.graphics.Color
 import android.os.Build
 import android.os.PowerManager
+import android.util.Log
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.luckyzero.tacotrainer.R
 import com.luckyzero.tacotrainer.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 // https://robertohuertas.com/2019/06/29/android_foreground_services/
 
+private const val TAG = "TimerService"
 private const val ID_RUNNING_TIMER = 1
 
 @AndroidEntryPoint
@@ -28,59 +32,58 @@ class TimerService : LifecycleService() {
     @Inject
     lateinit var timerRunner: TimerRunner
     private var wakeLock: PowerManager.WakeLock? = null
+    private var timerJob: Job? = null
+    private var currentTimerId: Int? = null
 
     enum class Action {
-        LOAD,
         START,
         PAUSE,
         RESUME,
         STOP,
         RESTART,
-        CLEAR,
     }
 
     companion object {
-
-        private fun makeIntent(context: Context, action: Action): Intent {
+        private const val PARAM_TIMER_ID = "TimerId"
+        private fun makeIntent(context: Context, action: Action, timerId: Int): Intent {
             return Intent(context, TimerService::class.java).also {
                 it.action = action.name
+                it.putExtra(PARAM_TIMER_ID, timerId)
             }
         }
 
-        fun start(context: Context) {
-            context.startService(makeIntent(context, Action.START))
+        fun start(timerId: Int, context: Context) {
+            context.startService(makeIntent(context, Action.START, timerId))
         }
 
-        fun pause(context: Context) {
-            context.startService(makeIntent(context, Action.PAUSE))
+        fun pause(timerId: Int, context: Context) {
+            context.startService(makeIntent(context, Action.PAUSE, timerId))
         }
 
-        fun resume(context: Context) {
-            context.startService(makeIntent(context, Action.RESUME))
+        fun resume(timerId: Int, context: Context) {
+            context.startService(makeIntent(context, Action.RESUME, timerId))
         }
 
-        fun stop(context: Context) {
-            context.startService(makeIntent(context, Action.STOP))
+        fun stop(timerId: Int, context: Context) {
+            context.startService(makeIntent(context, Action.STOP, timerId))
         }
 
-        fun restart(context: Context) {
-            context.startService(makeIntent(context, Action.RESTART))
+        fun restart(timerId: Int, context: Context) {
+            context.startService(makeIntent(context, Action.RESTART, timerId))
         }
-
-        fun clear(context: Context) {
-            context.startService(makeIntent(context, Action.CLEAR))
-        }
-
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         if (intent != null) {
+            val timerId = intent.getIntExtra(PARAM_TIMER_ID, 0)
+            check(timerId != 0, { "TimerId unset" } )
             when (intent.action) {
-                Action.START.name -> startWorkout()
-                Action.PAUSE.name -> pauseWorkout()
-                Action.RESUME.name -> resumeWorkout()
-                Action.STOP.name -> stopWorkout()
+                Action.START.name -> startWorkout(timerId)
+                Action.PAUSE.name -> pauseWorkout(timerId)
+                Action.RESUME.name -> resumeWorkout(timerId)
+                Action.STOP.name -> stopWorkout(timerId)
+                Action.RESTART.name -> restartWorkout(timerId)
                 else -> error("Unexpected action ${intent.action}")
             }
         }
@@ -90,6 +93,7 @@ class TimerService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
+        // TODO: No notification gets displayed here, I don't know why not.
         val notification = createNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(ID_RUNNING_TIMER, notification, FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -104,31 +108,52 @@ class TimerService : LifecycleService() {
         super.onDestroy()
     }
 
-    private fun startWorkout() {
-        // Starting service and starting workout are not the same thing
-        timerRunner.serviceStart(lifecycleScope)
+    private fun startWorkout(timerId: Int) {
+        timerRunner.serviceStart(timerId)
+        startLoop(timerId)
     }
 
-    private fun pauseWorkout() {
-        timerRunner.servicePause()
+    private fun pauseWorkout(timerId: Int) {
+        timerRunner.servicePause(timerId)
+    }
+
+    private fun resumeWorkout(timerId: Int) {
+        timerRunner.serviceResume(timerId)
+        startLoop(timerId)
+    }
+
+    private fun stopWorkout(timerId: Int) {
+        timerRunner.serviceStop(timerId)
+    }
+
+    private fun restartWorkout(timerId: Int) {
+        timerRunner.serviceRestart(timerId)
+        startLoop(timerId)
+    }
+
+    private fun startLoop(timerId: Int) {
+        Log.d(TAG, "start loop")
+        if (timerJob != null) {
+            if (currentTimerId != timerId) {
+                Log.d(TAG, "replacing job for timer $currentTimerId with $timerId")
+                timerJob?.cancel()
+                timerJob = null
+            } else {
+                Log.w(TAG, "requested another job for timer $timerId")
+            }
+        }
+        if (timerJob == null) {
+            timerJob = lifecycleScope.launch {
+                timerRunner.runTicks(timerId)
+                onTimerFinished(timerId)
+            }
+        }
+    }
+
+    private fun onTimerFinished(timerId: Int) {
+        Log.d(TAG, "onTimerFinished timerId $timerId")
         stopSelf()
-    }
-
-    private fun resumeWorkout() {
-        timerRunner.serviceResume(lifecycleScope)
-    }
-
-    private fun stopWorkout() {
-        timerRunner.serviceStop()
-        stopSelf()
-    }
-
-    private fun restartWorkout() {
-        TODO("Need to implement")
-    }
-
-    private fun clearWorkout() {
-        TODO("Need to implement")
+        timerJob = null
     }
 
     private fun createNotification(): Notification {

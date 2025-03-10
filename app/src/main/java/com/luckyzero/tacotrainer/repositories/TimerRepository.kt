@@ -8,15 +8,18 @@ interface TimerRepository {
     val workoutFlow: StateFlow<SegmentInterface.Workout?>
     val timerStateFlow: StateFlow<TimerState>
 
-    enum class TimerRunState {
-        IDLE,
+    enum class WorkoutState {
+        NO_WORKOUT,
+        LOADING,
         READY,
         RUNNING,
         PAUSED,
+        FINISHED,
     }
 
     data class TimerState(
-        val runState: TimerRunState,
+        val workoutState: WorkoutState,
+        val timerId: Int?,
         val totalElapsedMs: Long?,
         val periodRemainMs: Long?,
         val currentPeriod: PeriodInstanceInterface?,
@@ -25,8 +28,10 @@ interface TimerRepository {
 
     suspend fun loadTimer(workoutId: Long)
     fun clearTimer()
+
     fun start()
     fun pause()
     fun resume()
     fun stop()
+    fun restart()
 }

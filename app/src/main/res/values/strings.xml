@@ -17,6 +17,7 @@
     <string name="button_start">Start</string>
     <string name="button_pause">Pause</string>
     <string name="button_resume">Resume</string>
+    <string name="button_restart">Restart</string>
     <string name="button_end_workout">End Workout</string>
     <string name="button_save">Save</string>
     <string name="button_discard">Discard</string>

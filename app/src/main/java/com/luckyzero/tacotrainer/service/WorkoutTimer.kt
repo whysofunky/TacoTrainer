@@ -6,12 +6,17 @@ import com.luckyzero.tacotrainer.models.PeriodInstanceInterface
 private const val TAG = "WorkoutTimer"
 
 class WorkoutTimer(
+    val timerId: Int,
     private val periodList: List<PeriodInstanceInterface>
 ) {
-    private var started: Boolean = false
-    private var running: Boolean = false
-    private var finished: Boolean = false
-
+    enum class State {
+        IDLE,
+        RUNNING,
+        PAUSED,
+        FINISHED
+    }
+    var state: State = State.IDLE
+        private set
     var totalElapsedMs: Long = 0
         private set
     var periodRemainMs: Long = 0
@@ -31,44 +36,55 @@ class WorkoutTimer(
     }
 
     fun start(clockTimeMs: Long) {
-        if (started) error("Starting timer twice")
-        if (finished) error("Already finished")
-        started = true
-        running = true
+        if (state == State.RUNNING || state == State.PAUSED) error("Starting timer twice")
+        if (state == State.FINISHED) error("Already finished")
+        state = State.RUNNING
         startTimeMs = clockTimeMs
     }
 
     fun pause(clockTimeMs: Long) {
-        if (!started) error("Not started")
-        if (!running) return
+        if (state != State.RUNNING) error("Not started")
+        state = State.PAUSED
         pausedStartTimeMs = clockTimeMs
-        running = false
-        Log.d(TAG, "pause $pausedStartTimeMs")
     }
 
     fun resume(clockTimeMs: Long) {
-        if (!started) error("Not started")
-        if (running) return
+        if (state != State.PAUSED) error("Not currently paused")
+        state = State.RUNNING
         pausedDurationMs += (clockTimeMs - (pausedStartTimeMs ?: 0))
-        running = true
-        Log.d(TAG, "resume $pausedDurationMs")
     }
 
-    fun finish() {
-        if (!started) error("Not started")
-        running = false
-        finished = true
+    fun ensureStopped() {
+        state = State.FINISHED
     }
 
-    fun finished() : Boolean {
-        return finished
+    fun stop() {
+        if (state != State.RUNNING && state != State.PAUSED) error("Not running: state $state")
+        state = State.FINISHED
+    }
+
+    fun restart(clockTimeMs: Long) {
+        // The same as Start, but doesn't worry about the finished state.
+        if (state == State.RUNNING || state == State.PAUSED) error("Starting timer twice")
+        if (state == State.IDLE) error("Never was started")
+        state = State.RUNNING
+        startTimeMs = clockTimeMs
+        totalElapsedMs = 0
+        periodRemainMs = 0
+        pausedStartTimeMs = null
+        pausedDurationMs = 0
+        currentIdx = 0
+    }
+
+    fun active() : Boolean {
+        return state == State.RUNNING
     }
 
     // Returns milliseconds until next period ends.
     fun onTimeUpdate(clockTimeMs: Long) : Long {
         val newElapsedTime = clockTimeMs - startTimeMs - pausedDurationMs
-        Log.d(TAG, "onTimeUpdate $clockTimeMs start $startTimeMs paused $pausedDurationMs elapsed $newElapsedTime")
-        return updateElapsedTime(newElapsedTime)
+        val nextPeriod = updateElapsedTime(newElapsedTime)
+        return nextPeriod
     }
 
     private fun updateElapsedTime(newElapsedTime: Long) : Long {
@@ -83,7 +99,7 @@ class WorkoutTimer(
         currentPeriod()?.let {
             periodRemainMs = it.endOffsetMs - newElapsedTime
         } ?: run {
-            finished = true
+            state = State.FINISHED
             periodRemainMs = 0
         }
         return periodRemainMs
