@@ -98,7 +98,6 @@ private data class WorkoutExecuteContext(
     val nextPeriod get() = viewModel.nextPeriodFlow
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutExecutePage(args: WorkoutExecute,
                        navHostController: NavHostController,
@@ -110,6 +109,8 @@ fun WorkoutExecutePage(args: WorkoutExecute,
     val coroutineScope = rememberCoroutineScope()
     LaunchedEffect(EFFECT_INITIAL_LAUNCH) {
         if (viewModel.workoutFlow.value?.id != args.workoutId) {
+            // TODO: If we have an existing workout and this one doesn't match, present a
+            // dialog asking of we should continue the existing one or start the new one.
             viewModel.loadWorkout(workoutId = args.workoutId)
         }
         coroutineScope.launch {

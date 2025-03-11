@@ -2,7 +2,7 @@
     <string name="app_name">TacoTrainer</string>
 
     <string name="placeholder_workout_name">Workout Name</string>
-    <string name="placeholder_period_name">Name</string>
+    <string name="placeholder_period_name">Period Name</string>
 
     <string name="heading_main_set">Main set</string>
     <string name="heading_repeat_count">Repeat: %1$d</string>
@@ -20,7 +20,7 @@
     <string name="button_restart">Restart</string>
     <string name="button_end_workout">End Workout</string>
     <string name="button_save">Save</string>
-    <string name="button_discard">Discard</string>
+    <string name="button_cancel">Cancel</string>
     <string name="button_delete">Delete</string>
     <string name="button_add_set">Add Set</string>
     <string name="button_add_period">Add Period</string>
