@@ -65,7 +65,7 @@ class SegmentTreeLoader @Inject constructor (dbAccess: DbAccess) {
                 1
             )
             parent.children.add(set)
-            val id = createSetEntity(set)
+            createSetEntity(set)
             return set
         }
 
@@ -78,7 +78,7 @@ class SegmentTreeLoader @Inject constructor (dbAccess: DbAccess) {
                 0
             )
             parent.children.add(period)
-            val id = createPeriodEntity(period)
+            createPeriodEntity(period)
             return period
         }
 
@@ -130,7 +130,9 @@ class SegmentTreeLoader @Inject constructor (dbAccess: DbAccess) {
                 sequence
             )
             return withContext(Dispatchers.IO) {
-                segmentDao.insert(segmentEntity)
+                segmentDao.insert(segmentEntity).also {
+                    set.segmentId = it
+                }
             }
         }
 
@@ -149,9 +151,9 @@ class SegmentTreeLoader @Inject constructor (dbAccess: DbAccess) {
                 sequence
             )
             return withContext(Dispatchers.IO) {
-                val id = segmentDao.insert(segmentEntity)
-                period.segmentId = id
-                id
+                segmentDao.insert(segmentEntity).also {
+                    period.segmentId = it
+                }
             }
         }
 
