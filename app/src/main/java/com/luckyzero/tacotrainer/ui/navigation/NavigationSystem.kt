@@ -2,6 +2,7 @@ package com.luckyzero.tacotrainer.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -11,19 +12,18 @@ import com.luckyzero.tacotrainer.ui.pages.WorkoutExecutePage
 import com.luckyzero.tacotrainer.ui.pages.WorkoutListPage
 
 @Composable
-fun NavigationSystem() {
-    val navController = rememberNavController()
-    NavHost(navController, startDestination = WorkoutList) {
+fun NavigationSystem(navHostController: NavHostController) {
+    NavHost(navHostController, startDestination = WorkoutList) {
         composable<WorkoutList> {
-            WorkoutListPage(navController, modifier = Modifier)
+            WorkoutListPage(navHostController, modifier = Modifier)
         }
         composable<WorkoutEdit> {
             val args = it.toRoute<WorkoutEdit>()
-            WorkoutEditPage(args, navController, modifier = Modifier)
+            WorkoutEditPage(args, navHostController, modifier = Modifier)
         }
         composable<WorkoutExecute> {
-            var args = it.toRoute<WorkoutExecute>()
-            WorkoutExecutePage(args, navController, modifier = Modifier)
+            val args = it.toRoute<WorkoutExecute>()
+            WorkoutExecutePage(args, navHostController, modifier = Modifier)
         }
     }
 }

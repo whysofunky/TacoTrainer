@@ -28,6 +28,9 @@
 
     <string name="workout_finished">Workout Finished</string>
 
+    <string name="notification_channel_name">TacoTrainer timer</string>
+    <string name="notification_channel_description">Displays in progress workout timer</string>
+
 
 
 </resources>

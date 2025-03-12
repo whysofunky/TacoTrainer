@@ -274,7 +274,6 @@ private fun PeriodNotes(executeContext: WorkoutExecuteContext) {
 private fun ButtonBar(executeContext: WorkoutExecuteContext) {
     val state by executeContext
         .state.collectAsStateWithLifecycle(WorkoutExecuteViewModel.State.IDLE)
-    Log.d(TAG, "display state $state")
     when (state) {
         WorkoutExecuteViewModel.State.IDLE -> {
             // This should be a transient state
