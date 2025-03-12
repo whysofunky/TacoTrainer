@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,6 +34,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.luckyzero.tacotrainer.ui.navigation.NavigationSystem
 import com.luckyzero.tacotrainer.ui.theme.TacoTrainerTheme
+import com.luckyzero.tacotrainer.ui.widgets.DynamicFooter
+import com.luckyzero.tacotrainer.ui.widgets.DynamicFooterConfig
 import com.luckyzero.tacotrainer.ui.widgets.DynamicTopBar
 import com.luckyzero.tacotrainer.ui.widgets.TopBarConfig
 import dagger.hilt.android.AndroidEntryPoint
@@ -57,6 +60,7 @@ private fun MainContent() {
     TacoTrainerTheme(isDynamicColor = false) {
         Scaffold(
             topBar = { DynamicTopBar(navHostController, topBarConfig) },
+            bottomBar = { DynamicFooter(DynamicFooterConfig()) },
             modifier = Modifier.fillMaxSize()
         ) {innerPadding ->
             Box(modifier = Modifier.padding(innerPadding)) {
