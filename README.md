@@ -4,14 +4,17 @@ Android app to help with interval training
 TODO
 
 General
- * Back button in header
- *   https://github.com/pgatti86/toolbar-demo/blob/main/app/src/main/java/dev/gatti/toolbardemo/MainActivity.kt
+ * Header
+ *   Move out of activity
+ *   Control back button
  * Style status bar
  * Style navigation bar
  * Set up app theming better
  *   https://developer.android.com/develop/ui/compose/compositionlocal
  *   https://developer.android.com/develop/ui/compose/designsystems/material3
  *   https://developer.android.com/codelabs/jetpack-compose-theming#3
+ * Footer
+ *   Display footer everywhere in the UI if a workout is running
 
 Entry fields:
   * consider using normal TextField all the time (readonly = true when not selected)
@@ -38,16 +41,21 @@ Workout run page:
 
 Workout lifecycle 
  * If page is launched while a timer is in progress, either just keep displaying that, or ask if they want to cancel that workout and start a new one.
+ * If a workout is launched, and the same workout is already finished, just restart it.
  * Confirm dialog before end workout
  * Persist paused workout state and reload on app restart
 
-Workout timer
- * Post notifications when running
- * Hold wake lock during timer run
- * Make sound on transitions (use SoundPool https://developer.android.com/reference/android/media/SoundPool, https://stackoverflow.com/questions/9656853/the-correct-way-to-play-short-sounds-android)
+Timer service
+ * Fix sound on notification, it should play on period transitions but it doesn't work.
+ * Make sound on transitions
+ *   Consider SoundPool https://developer.android.com/reference/android/media/SoundPool, https://stackoverflow.com/questions/9656853/the-correct-way-to-play-short-sounds-android)
+ * Service stops when paused, so notification disappears.
+ * Hold wakelock only when timer is running
+ * 
+
+Workout timer UI
  * Period timer moves after finishing, some layout problem.
- * If launched with a different workout, prompt to ask if we should change.
- * If launched for same workout, but it's already finished, automatically restart.
+ * Don't have topApp bar on the timer page
 
 Settings page
  * Max HR
@@ -63,5 +71,5 @@ Period note types
  * FTP range (manual)
  * Target pace
  * Target speed
- * Free form
+ * Free form (gear, elevation, resistance)
 
