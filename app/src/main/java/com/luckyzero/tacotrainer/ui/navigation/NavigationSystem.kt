@@ -10,9 +10,10 @@ import androidx.navigation.toRoute
 import com.luckyzero.tacotrainer.ui.pages.WorkoutEditPage
 import com.luckyzero.tacotrainer.ui.pages.WorkoutExecutePage
 import com.luckyzero.tacotrainer.ui.pages.WorkoutListPage
+import com.luckyzero.tacotrainer.ui.widgets.TopBarConfig
 
 @Composable
-fun NavigationSystem(navHostController: NavHostController) {
+fun NavigationSystem(navHostController: NavHostController, topBarConfig: TopBarConfig) {
     NavHost(navHostController, startDestination = WorkoutList) {
         composable<WorkoutList> {
             WorkoutListPage(navHostController, modifier = Modifier)
