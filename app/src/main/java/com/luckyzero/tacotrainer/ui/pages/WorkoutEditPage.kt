@@ -21,9 +21,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,9 +38,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -49,7 +53,9 @@ import com.luckyzero.tacotrainer.models.FlatSegmentInterface
 import com.luckyzero.tacotrainer.models.WorkoutInterface
 import com.luckyzero.tacotrainer.ui.navigation.WorkoutEdit
 import com.luckyzero.tacotrainer.ui.utils.UIUtils
+import com.luckyzero.tacotrainer.ui.utils.visibility
 import com.luckyzero.tacotrainer.ui.widgets.CountField
+import com.luckyzero.tacotrainer.ui.widgets.CountField2
 import com.luckyzero.tacotrainer.ui.widgets.DurationField
 import com.luckyzero.tacotrainer.ui.widgets.NameField
 import com.luckyzero.tacotrainer.viewModels.WorkoutEditViewModel
@@ -198,7 +204,7 @@ private fun SegmentItem(flatSegmentItem: FlatSegmentInterface,
                         workoutEditContext: WorkoutEditContext) {
     when (flatSegmentItem) {
         is FlatSegmentInterface.Set ->
-            WorkoutSetItem(flatSegmentItem, workoutEditContext)
+            WorkoutSetRow(flatSegmentItem, workoutEditContext)
         is FlatSegmentInterface.Period ->
             WorkoutPeriodItem(flatSegmentItem, workoutEditContext)
         is FlatSegmentInterface.SetFooter ->
@@ -207,8 +213,8 @@ private fun SegmentItem(flatSegmentItem: FlatSegmentInterface,
 }
 
 @Composable
-private fun WorkoutSetItem(set: FlatSegmentInterface.Set,
-                           workoutEditContext: WorkoutEditContext) {
+private fun WorkoutSetRow(set: FlatSegmentInterface.Set,
+                          workoutEditContext: WorkoutEditContext) {
     val focusRequester = remember { FocusRequester() }
     val itemId = ItemId.Set(set.id)
     LaunchedEffect(workoutEditContext.selectedItem.value == itemId) {
@@ -223,15 +229,101 @@ private fun WorkoutSetItem(set: FlatSegmentInterface.Set,
                 .fillMaxWidth()
                 .height(TREE_INDICATOR_HEIGHT_DP.dp)
                 .background(color = MaterialTheme.colorScheme.primary)
+                .height(TREE_INDICATOR_HEIGHT_DP.dp)
             )
             Row {
                 Spacer(modifier = Modifier.width(TREE_SPACER_WIDTH_DP.dp))
+                WorkoutSetItem(set,
+                    workoutEditContext,
+                    focusRequester)
+/*
                 if (workoutEditContext.selectedItem.value == itemId) {
                     EditableWorkoutSetItem(set, workoutEditContext, focusRequester)
                 } else {
                     StaticWorkoutSetItem(set, workoutEditContext)
                 }
+ */
             }
+        }
+    }
+}
+
+@Composable
+private fun WorkoutSetItem(set: FlatSegmentInterface.Set,
+                           workoutEditContext: WorkoutEditContext,
+                           focusRequester: FocusRequester) {
+    val repeatCount = rememberSaveable { mutableIntStateOf(set.repeatCount) }
+    val itemId = ItemId.Set(set.id)
+    val editable by remember { derivedStateOf { workoutEditContext.selectedItem.value == itemId } }
+    Column(modifier = Modifier.clickable {
+        if (editable)
+            workoutEditContext.selectedItem.value = null
+        else
+            workoutEditContext.selectedItem.value = itemId
+    }) {
+        if (set.depth == 0) {
+            Text(text = stringResource(R.string.heading_main_set), fontSize = 20.sp)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier) {
+            Text(text = stringResource(R.string.heading_repeat), fontSize = 20.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Box {
+                // If we're not editable, show a regular text label, but with the same
+                // padding as the editable TextField. This way it will not move when we
+                // switch back and forth.
+                Text(
+                    text = set.repeatCount.toString(),
+                    fontSize = 20.sp,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier
+                        .width(96.dp)
+                        .padding(TextFieldDefaults.contentPaddingWithoutLabel())
+                        .visibility(!editable)
+                )
+                CountField2(repeatCount,
+                    textStyle = TextStyle(fontSize = 20.sp),
+                    modifier = Modifier
+                        .width(96.dp)
+                        .focusRequester(focusRequester)
+                        .visibility(editable),
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+        }
+        if (editable) {
+            ItemButtonRow(
+                onSave = {
+                    workoutEditContext.selectedItem.value = null
+                    if (set.id == 0L) {
+                        workoutEditContext.viewModel.updateWorkout(null, repeatCount.intValue)
+                    } else {
+                        workoutEditContext.viewModel.updateSet(set.id, repeatCount.intValue)
+                    }
+                },
+                onCancel = {
+                    workoutEditContext.selectedItem.value = null
+                },
+                onDelete = {
+                    workoutEditContext.selectedItem.value = null
+                    workoutEditContext.viewModel.deleteSet(set.id)
+                },
+                showDelete = (set.id != 0L)
+            )
+        }
+    }
+}
+
+@Composable fun ItemButtonRow(onSave: () -> Unit,
+                              onCancel: () -> Unit,
+                              onDelete: () -> Unit,
+                              showDelete: Boolean) {
+    Row {
+        SaveButton(onClick = onSave)
+        Spacer(modifier = Modifier.width(BUTTON_SPACE_DP.dp))
+        CancelButton(onClick = onCancel)
+        if (showDelete) {
+            Spacer(modifier = Modifier.weight(1f))
+            DeleteButton(onClick = onDelete)
         }
     }
 }
@@ -438,6 +530,14 @@ fun CancelButton(onClick: () -> Unit) {
         Text(text = stringResource(R.string.button_cancel))
     }
 }
+
+@Composable
+fun DeleteButton(onClick: () -> Unit) {
+    Button(onClick = onClick) {
+        Text(text = stringResource(R.string.button_delete))
+    }
+}
+
 
 @Composable
 private fun StaticWorkoutSetFooterItem(setFooter: FlatSegmentInterface.SetFooter,

@@ -7,6 +7,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.mutableStateOf
@@ -73,6 +74,61 @@ fun CountField(count: MutableIntState,
                 innerTextField()
             }
         },
+        modifier = modifier.onFocusChanged {
+            if (it.isFocused) {
+                val text = textState.value.text
+                textState.value = textState.value.copy(selection = TextRange(0, text.length))
+            }
+        },
+    )
+}
+
+@Composable
+fun CountField2(count: MutableIntState,
+                textStyle: TextStyle = LocalTextStyle.current,
+                modifier: Modifier = Modifier,
+) {
+    val textState = remember {
+        mutableStateOf(TextFieldValue(count.intValue.toString()))
+    }
+
+    val onValueChange = { newValue: TextFieldValue ->
+        Log.d(TAG, "input value '${newValue.text}', " +
+                "selection ${newValue.selection.start}-${newValue.selection.end}")
+        val numbersOnly = newValue.text
+            .filter { it.isDigit() }
+            .takeLast(6) // No more than six digits. Prevents integer overflow.
+        val selectionEnd = newValue.selection.end
+        val newValueInt = if (numbersOnly.isBlank()) 0 else numbersOnly.toInt()
+        // TODO: It would be nice to retain zeros to the right of the selection.
+        val newText = if (newValueInt > 0) {
+            newValueInt.toString()
+        } else {
+            ""
+        }
+        val outputValue = newValue.copy(text = newText)
+        Log.d(TAG, "output value '${outputValue.text}', " +
+                "selection ${outputValue.selection.start}-${outputValue.selection.end}")
+        textState.value = outputValue
+        count.intValue = newValueInt
+    }
+
+    TextField(
+        value = textState.value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        keyboardOptions =  KeyboardOptions.Default.copy(
+            imeAction = ImeAction.Done,
+            keyboardType = KeyboardType.Number
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = {
+                textState.value = textState.value.copy(
+                    text = count.intValue.toString()
+                )
+            }
+        ),
+        textStyle = textStyle.copy(textAlign = TextAlign.End),
         modifier = modifier.onFocusChanged {
             if (it.isFocused) {
                 val text = textState.value.text
