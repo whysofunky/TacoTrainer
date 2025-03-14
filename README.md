@@ -5,23 +5,23 @@ TODO
 
 General
  * Header
- *   Move out of activity
- *   Control back button
+ ** Move out of activity
+ ** Control back button, it should not be present if there is no option to go back.
  * Style status bar
  * Style navigation bar
  * Set up app theming better
- *   https://developer.android.com/develop/ui/compose/compositionlocal
- *   https://developer.android.com/develop/ui/compose/designsystems/material3
- *   https://developer.android.com/codelabs/jetpack-compose-theming#3
+ ** https://developer.android.com/develop/ui/compose/compositionlocal
+ ** https://developer.android.com/develop/ui/compose/designsystems/material3
+ ** https://developer.android.com/codelabs/jetpack-compose-theming#3
  * Footer
- *   Display footer everywhere in the UI if a workout is running
+ ** Display footer everywhere in the UI if a workout is running
 
 Entry fields:
-  * consider using normal TextField all the time (readonly = true when not selected)
-  * fix deletion of ":". If the cursor is to the right of the ":" and you hit backspace, it
-    will delete the ":", which has no effect other than moving the cursor.
-  * automatically select whole thing on entry (Partially works: There is a bug that sometimes
-    the text is deselected immediately in onValueChange)
+ * consider using normal TextField all the time (readonly = true when not selected)
+ * fix deletion of ":". If the cursor is to the right of the ":" and you hit backspace, it
+   will delete the ":", which has no effect other than moving the cursor.
+ * automatically select whole thing on entry (Partially works: There is a bug that sometimes
+   the text is deselected immediately in onValueChange)
 
 Edit page:
  * Confirm before delete
@@ -35,6 +35,7 @@ Edit page:
 List page:
  * improve UI
  * Confirm before delete
+ * Make "new" button a FAB
 
 Workout run page:
  * Animate transitions between periods
@@ -51,7 +52,6 @@ Timer service
  *   Consider SoundPool https://developer.android.com/reference/android/media/SoundPool, https://stackoverflow.com/questions/9656853/the-correct-way-to-play-short-sounds-android)
  * Service stops when paused, so notification disappears.
  * Hold wakelock only when timer is running
- * 
 
 Workout timer UI
  * Period timer moves after finishing, some layout problem.
