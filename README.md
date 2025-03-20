@@ -4,17 +4,17 @@ Android app to help with interval training
 TODO
 
 General
- *Header
- *Move out of activity
- **Control back button, it should not be present if there is no option to go back.
- **Style status bar
- **Style navigation bar
- *Set up app theming better
- **https://developer.android.com/develop/ui/compose/compositionlocal
- **https://developer.android.com/develop/ui/compose/designsystems/material3
- **https://developer.android.com/codelabs/jetpack-compose-theming#3
+ * Header
+ * Move out of activity
+   * Control back button, it should not be present if there is no option to go back.
+   * Style status bar
+   * Style navigation bar
+ * Set up app theming better
+   * https://developer.android.com/develop/ui/compose/compositionlocal
+   * https://developer.android.com/develop/ui/compose/designsystems/material3
+   * https://developer.android.com/codelabs/jetpack-compose-theming#3
  * Footer
- ** Display footer everywhere in the UI if a workout is running
+   * Display footer everywhere in the UI if a workout is running
 
 Entry fields:
  * consider using normal TextField all the time (readonly = true when not selected)
